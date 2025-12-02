@@ -1,0 +1,134 @@
+{
+  "levels": [
+    {
+      "level": 1,
+      "image": "/assets/questions/jungle/jungle_0.jpg",
+      "question": "Sample question 0 for jungle: What is related to lion?",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "answer": "A",
+      "hint": "This is a hint about lion."
+    },
+    {
+      "level": 2,
+      "image": "/assets/questions/jungle/jungle_1.jpg",
+      "question": "Sample question 1 for jungle: What is related to elephant?",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "answer": "A",
+      "hint": "This is a hint about elephant."
+    },
+    {
+      "level": 3,
+      "image": "/assets/questions/jungle/jungle_2.jpg",
+      "question": "Sample question 2 for jungle: What is related to eagle?",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "answer": "A",
+      "hint": "This is a hint about eagle."
+    },
+    {
+      "level": 4,
+      "image": "/assets/questions/jungle/jungle_3.jpg",
+      "question": "Sample question 3 for jungle: What is related to frog?",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "answer": "A",
+      "hint": "This is a hint about frog."
+    },
+    {
+      "level": 5,
+      "image": "/assets/questions/jungle/jungle_4.jpg",
+      "question": "Sample question 4 for jungle: What is related to lion?",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "answer": "A",
+      "hint": "This is a hint about lion."
+    },
+    {
+      "level": 6,
+      "image": "/assets/questions/jungle/jungle_5.jpg",
+      "question": "Sample question 5 for jungle: What is related to elephant?",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "answer": "A",
+      "hint": "This is a hint about elephant."
+    },
+    {
+      "level": 7,
+      "image": "/assets/questions/jungle/jungle_6.jpg",
+      "question": "Sample question 6 for jungle: What is related to eagle?",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "answer": "A",
+      "hint": "This is a hint about eagle."
+    },
+    {
+      "level": 8,
+      "image": "/assets/questions/jungle/jungle_7.jpg",
+      "question": "Sample question 7 for jungle: What is related to frog?",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "answer": "A",
+      "hint": "This is a hint about frog."
+    },
+    {
+      "level": 9,
+      "image": "/assets/questions/jungle/jungle_8.jpg",
+      "question": "Sample question 8 for jungle: What is related to lion?",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "answer": "A",
+      "hint": "This is a hint about lion."
+    },
+    {
+      "level": 10,
+      "image": "/assets/questions/jungle/jungle_9.jpg",
+      "question": "Sample question 9 for jungle: What is related to elephant?",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "answer": "A",
+      "hint": "This is a hint about elephant."
+    }
+  ]
+}
