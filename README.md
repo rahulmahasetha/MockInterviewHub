@@ -12,4 +12,8 @@ To run:
 1. npm install
 2. npm start
 
-Note: This repo uses react-scripts (Create React App). Replace the sample map image with your own for each category in src/assets/maps/.
+<img width="1365" height="767" alt="Screenshot 2026-05-14 001432" src="https://github.com/user-attachments/assets/45f529e8-1c45-4141-a0c2-e8285c6b8762" />
+<img width="1358" height="767" alt="Screenshot 2026-05-14 001456" src="https://github.com/user-attachments/assets/39750676-8bd6-42d2-94a6-a7d36c8fa280" />
+<img width="1353" height="763" alt="Screenshot 2026-05-14 001530" src="https://github.com/user-attachments/assets/4a44b913-49b3-408e-88fb-4784e41633ec" />
+
+
