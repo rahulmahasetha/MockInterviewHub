@@ -7,8 +7,10 @@ import { useUserProgress } from "../context/UserProgressContext";
 <FaBook className="nav-icon" />
 
 export default function Home() {
-  const { progress, resetProgress } = useUserProgress();
+  const { progress, resetProgress, loginUser, logoutUser } = useUserProgress();
   const [showInstructions, setShowInstructions] = useState(false);
+  const [nicknameInput, setNicknameInput] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const totalScore =
     (progress.science?.score || 0) +
@@ -17,10 +19,10 @@ export default function Home() {
     (progress.history?.score || 0);
 
   const completedSections = [
-    progress.science?.passed?.length > 0,
-    progress.jungle?.passed?.length > 0,
-    progress.math?.passed?.length > 0,
-    progress.history?.passed?.length > 0
+    (progress.science?.passed?.length || 0) > 0,
+    (progress.jungle?.passed?.length || 0) > 0,
+    (progress.math?.passed?.length || 0) > 0,
+    (progress.history?.passed?.length || 0) > 0
   ].filter(Boolean).length;
 
   const progressPercentage = (completedSections / 4) * 100;
@@ -44,6 +46,56 @@ export default function Home() {
 
   return (
     <div className="home-container">
+      {/* Nickname / Login Modal */}
+      {!progress.username && (
+        <div className="instructions-overlay" style={{ zIndex: 1100 }}>
+          <div className="instructions-modal" style={{ maxWidth: "450px", textAlign: "center" }}>
+            <div className="modal-header" style={{ justifyContent: "center" }}>
+              <h2>🎮 Enter Your Nickname</h2>
+            </div>
+            <div className="instructions-content" style={{ marginTop: "15px" }}>
+              <p style={{ color: "#666", marginBottom: "20px" }}>
+                Embark on your EduQuest adventure! Enter a username to store your progress and leaderboard scores in MongoDB.
+              </p>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!nicknameInput.trim()) return alert("Please enter a valid nickname!");
+                setIsSubmitting(true);
+                await loginUser(nicknameInput.trim());
+                setIsSubmitting(false);
+              }}>
+                <input
+                  type="text"
+                  placeholder="e.g. CaptainQuest"
+                  value={nicknameInput}
+                  onChange={(e) => setNicknameInput(e.target.value)}
+                  disabled={isSubmitting}
+                  style={{
+                    width: "100%",
+                    padding: "12px 20px",
+                    borderRadius: "25px",
+                    border: "2px solid #e9ecef",
+                    fontSize: "1rem",
+                    marginBottom: "20px",
+                    outline: "none",
+                    textAlign: "center",
+                    boxSizing: "border-box"
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="start-button"
+                  style={{ width: "100%", padding: "12px" }}
+                >
+                  {isSubmitting ? "Connecting..." : "Begin Quest 🚀"}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Instructions Modal */}
       {showInstructions && (
         <div className="instructions-overlay">
@@ -131,6 +183,12 @@ export default function Home() {
           </div>
           
           <div className="nav-controls">
+            {progress.username && (
+              <span className="user-badge-nav" style={{ marginRight: '5px' }}>
+                👤 {progress.username}
+              </span>
+            )}
+
             <button 
               onClick={() => setShowInstructions(true)}
               className="nav-btn instructions-btn"
@@ -148,6 +206,13 @@ export default function Home() {
               <span className="btn-icon">🔄</span>
               <span className="btn-text">Reset</span>
             </button>
+
+            {progress.username && (
+              <button onClick={logoutUser} className="nav-btn logout-btn" style={{ marginLeft: '5px' }}>
+                <span className="btn-icon">🚪</span>
+                <span className="btn-text">Sign Out</span>
+              </button>
+            )}
           </div>
         </div>
       </nav>
@@ -519,6 +584,33 @@ const styles = `
   border-color: #ff6b6b;
   background: #ff6b6b;
   color: white;
+  transform: translateY(-1px);
+}
+
+.user-badge-nav {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  box-shadow: 0 4px 10px rgba(102, 126, 234, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.logout-btn {
+  border-color: #ff6b6b;
+  background: white;
+  color: #ff6b6b;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  border-color: #ff4747;
+  background: #fff5f5;
+  color: #ff4747;
   transform: translateY(-1px);
 }
 

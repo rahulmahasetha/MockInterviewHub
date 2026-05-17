@@ -1,0 +1,27 @@
+# Node packages and modules
+**/node_modules/
+
+# Backend configurations and local credentials
+**/backend/.env
+
+# Local fallback database records (avoids polluting GitHub with personal scores)
+**/backend/db_fallback.json
+
+# Development scripts
+**/backend/check_db.js
+**/backend/list_categories.js
+**/backend/sync_category_questions.js
+
+# Production React build directory
+**/frontend/build/
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System & IDE folders
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db
