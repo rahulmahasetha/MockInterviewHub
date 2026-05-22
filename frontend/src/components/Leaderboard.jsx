@@ -1,193 +1,105 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserProgress } from "../context/UserProgressContext";
+import { quizAPI } from "../services/api";
 
 export default function Leaderboard() {
-  const { progress, globalLeaderboard, isLoading, fetchGlobalLeaderboard, saveToLeaderboard } = useUserProgress();
+  const { progress, globalLeaderboard, isLoading, fetchGlobalLeaderboard, saveToLeaderboard, getTotalScore, getCategoryProgress } = useUserProgress();
+  const [sections, setSections] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchGlobalLeaderboard();
+    async function loadCategories() {
+      try {
+        const response = await quizAPI.getCategories();
+        setSections(response.data || []);
+      } catch (error) {
+        setSections([]);
+      }
+    }
+    loadCategories();
   }, []);
 
-  const totalScore =
-    (progress.science?.score || 0) +
-    (progress.jungle?.score || 0) +
-    (progress.math?.score || 0) +
-    (progress.history?.score || 0);
-
-  const sections = [
-    { name: "Science", icon: "🔬", color: "#4CAF50", data: progress.science },
-    { name: "Jungle", icon: "🐾", color: "#FF9800", data: progress.jungle },
-    { name: "Math", icon: "➗", color: "#2196F3", data: progress.math },
-    { name: "History", icon: "🏛", color: "#9C27B0", data: progress.history }
-  ];
-
-  const completedSections = sections.filter(sec => sec.data?.passed?.length > 0).length;
-  const totalSections = sections.length;
+  const totalScore = getTotalScore();
+  const maxScore = sections.reduce((total, section) => total + ((section.levels?.length || 0) * 20), 0) || 1;
+  const completedSections = sections.filter(sec => getCategoryProgress(sec.slug).passed?.length > 0).length;
+  const totalSections = sections.length || 1;
   const completionPercentage = (completedSections / totalSections) * 100;
 
-  const handleContinueLearning = () => {
-    navigate('/');
-  };
-
   return (
-    <div className="leaderboard-container">
-      {/* Header Section */}
-      <header className="leaderboard-header">
-        <div className="header-content">
-          <div className="title-section">
-            <span className="trophy-icon">🏆</span>
-            <div>
-              <h1>Learning Leaderboard</h1>
-              <p className="subtitle">Track your learning journey and achievements</p>
-            </div>
+    <div className="lb-page">
+      <header className="lb-header">
+        <div className="lb-header-inner">
+          <div>
+            <h1 className="lb-heading">Learning Leaderboard</h1>
+            <p className="lb-sub">Track scores, quest progress, and global ranks.</p>
           </div>
+          <button onClick={() => navigate('/')} className="lb-back-btn">
+            Back to Home
+          </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="leaderboard-main">
-        {/* Overview Section - Medium Size Cards */}
-        <section className="overview-section">
-          <div className="overview-grid">
-            {/* Total Score Card */}
-            <div className="total-score-card">
-              <div className="score-header">
-                <span className="score-icon">⭐</span>
-                <h3>Total Score</h3>
-              </div>
-              <div className="score-value">{totalScore}</div>
-              <div className="score-max">/ 800</div>
-              <div className="progress-info">
-                <div className="progress-text">
-                  {Math.round((totalScore / 800) * 100)}% Complete
-                </div>
-              </div>
-              {totalScore > 0 && progress.username && (
-                <button
-                  onClick={async () => {
-                    await saveToLeaderboard(progress.username, totalScore);
-                  }}
-                  className="submit-leaderboard-btn"
-                  style={{
-                    marginTop: '15px',
-                    width: '100%',
-                    padding: '8px 12px',
-                    background: 'linear-gradient(45deg, #FFD700, #FFA000)',
-                    color: '#333',
-                    border: 'none',
-                    borderRadius: '20px',
-                    fontWeight: 'bold',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 10px rgba(255, 215, 0, 0.2)',
-                    transition: 'transform 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
-                  onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-                >
-                  🚀 Submit to Hall of Fame
-                </button>
-              )}
-            </div>
+      <main className="lb-main">
+        <section className="lb-overview">
+          <div className="lb-stat-card">
+            <div className="lb-stat-val" style={{ color: '#16A34A' }}>{totalScore}</div>
+            <div className="lb-stat-lbl">Total Score</div>
+            <div className="lb-stat-extra">{Math.round((totalScore / maxScore) * 100)}% of {maxScore}</div>
+            {totalScore > 0 && progress.username && (
+              <button
+                onClick={async () => await saveToLeaderboard(progress.username, totalScore)}
+                className="lb-submit-btn"
+              >
+                Submit Score
+              </button>
+            )}
+          </div>
 
-            {/* Highest Score Card */}
-            <div className="highest-score-card">
-              <div className="score-header">
-                <span className="score-icon">🔥</span>
-                <h3>Highest Score</h3>
-              </div>
-              <div className="highest-value">{progress.highestScore || 0}</div>
-              <div className="achievement-badge">
-                {progress.highestScore >= 700 ? "🏆 Master" : 
-                 progress.highestScore >= 600 ? "⭐ Advanced" :
-                 progress.highestScore >= 400 ? "🚀 Intermediate" :
-                 progress.highestScore >= 200 ? "🌱 Beginner" : "🎯 Newbie"}
-              </div>
+          <div className="lb-stat-card">
+            <div className="lb-stat-val" style={{ color: '#D97706' }}>{progress.highestScore || 0}</div>
+            <div className="lb-stat-lbl">Highest Score</div>
+            <div className="lb-badge">
+              {progress.highestScore >= 700 ? "Master" :
+               progress.highestScore >= 600 ? "Advanced" :
+               progress.highestScore >= 400 ? "Intermediate" :
+               progress.highestScore >= 200 ? "Beginner" : "New"}
             </div>
+          </div>
 
-            {/* Completion Stats */}
-            <div className="completion-card">
-              <div className="score-header">
-                <span className="score-icon">📊</span>
-                <h3>Progress</h3>
-              </div>
-              <div className="completion-stats">
-                <div className="stat-item">
-                  <div className="stat-value">{completedSections}</div>
-                  <div className="stat-label">Completed</div>
-                </div>
-                <div className="stat-item">
-                  <div className="stat-value">{totalSections}</div>
-                  <div className="stat-label">Total</div>
-                </div>
-              </div>
-              <div className="completion-text">
-                {Math.round(completionPercentage)}% Complete
-              </div>
-            </div>
+          <div className="lb-stat-card">
+            <div className="lb-stat-val" style={{ color: '#2563EB' }}>{completedSections}/{totalSections}</div>
+            <div className="lb-stat-lbl">Quests Done</div>
+            <div className="lb-stat-extra">{Math.round(completionPercentage)}% Complete</div>
           </div>
         </section>
 
-        {/* Categories Section - Horizontal Layout */}
-        <section className="categories-section">
-          <div className="section-header">
-            <h2>Category Performance</h2>
-            <p>Your progress across different learning adventures</p>
-          </div>
-
-          <div className="categories-horizontal">
+        <section className="lb-categories">
+          <h2 className="lb-section-title">Category Performance</h2>
+          <div className="lb-cat-grid">
             {sections.map((section) => {
-              const sectionData = section.data || {};
-              const completedLevels = sectionData.passed?.length || 0;
-              const totalLevels = 10;
-              const sectionScore = sectionData.score || 0;
-              const progressPercentage = (completedLevels / totalLevels) * 100;
-
+              const d = getCategoryProgress(section.slug);
+              const done = d.passed?.length || 0;
+              const totalLevels = section.levels?.length || 0;
+              const pct = totalLevels > 0 ? (done / totalLevels) * 100 : 0;
               return (
-                <div 
-                  key={section.name} 
-                  className="category-card-horizontal"
-                  style={{ '--card-color': section.color }}
-                >
-                  <div className="card-main">
-                    <div className="category-icon-large">{section.icon}</div>
-                    <div className="category-info">
-                      <h3 className="category-name">{section.name}</h3>
-                      <div className="level-info">
-                        Levels: {completedLevels}/{totalLevels}
-                      </div>
+                <div key={section.slug} className="lb-cat-card" style={{ '--accent': section.iconColor }}>
+                  <div className="lb-cat-top">
+                    <span className="lb-cat-icon" style={{ color: section.iconColor }}>{section.label}</span>
+                    <div className="lb-cat-info">
+                      <h3>{section.name}</h3>
+                      <span className="lb-cat-levels">{done}/{totalLevels} Levels</span>
                     </div>
-                    <div className="score-display">
-                      <div className="score-number">{sectionScore}</div>
-                      <div className="score-label">points</div>
-                    </div>
+                    <div className="lb-cat-score" style={{ color: section.iconColor }}>{d.score || 0}<small> pts</small></div>
                   </div>
-                  
-                  <div className="progress-section">
-                    <div className="progress-bar">
-                      <div 
-                        className="progress-fill"
-                        style={{ 
-                          width: `${progressPercentage}%`,
-                          backgroundColor: section.color
-                        }}
-                      ></div>
-                    </div>
-                    <div className="progress-text">
-                      {Math.round(progressPercentage)}% Complete
-                    </div>
+                  <div className="lb-cat-bar-track">
+                    <div className="lb-cat-bar-fill" style={{ width: `${pct}%`, background: section.iconColor }}></div>
                   </div>
-
-                  <div className="status-section">
-                    {completedLevels === totalLevels ? (
-                      <span className="status completed">✅ Completed</span>
-                    ) : completedLevels > 0 ? (
-                      <span className="status in-progress">🔄 In Progress</span>
-                    ) : (
-                      <span className="status not-started">🎯 Start Now</span>
-                    )}
+                  <div className="lb-cat-status">
+                    {totalLevels > 0 && done === totalLevels ? <span className="lb-status-done">Completed</span> :
+                     done > 0 ? <span className="lb-status-prog">In Progress</span> :
+                     <span className="lb-status-new">Not Started</span>}
                   </div>
                 </div>
               );
@@ -195,91 +107,38 @@ export default function Leaderboard() {
           </div>
         </section>
 
-        {/* Global Hall of Fame Section */}
-        <section className="global-leaderboard-section" style={{ marginTop: '50px', marginBottom: '40px' }}>
-          <div className="section-header">
-            <h2 style={{ color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.3)', fontSize: '2rem', fontWeight: 'bold' }}>🏆 Global Hall of Fame</h2>
-            <p style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '1.1rem', fontWeight: '300' }}>Real-time ranks of all adventurers stored in MongoDB</p>
-          </div>
+        <section className="lb-hall">
+          <h2 className="lb-section-title">Global Hall of Fame</h2>
+          <p className="lb-section-sub">Real-time ranks stored in MongoDB.</p>
 
-          <div className="leaderboard-table-container" style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '20px',
-            padding: '30px',
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
-            maxWidth: '850px',
-            margin: '0 auto',
-            overflowX: 'auto'
-          }}>
+          <div className="lb-table-wrap">
             {isLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px 20px', fontSize: '1.2rem', color: '#666', fontWeight: '500' }}>
-                ⏳ Loading global scores from MongoDB...
-              </div>
+              <div className="lb-loading">Loading global scores...</div>
             ) : globalLeaderboard.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 20px', fontSize: '1.2rem', color: '#666', fontWeight: '500' }}>
-                🌱 No scores in the Hall of Fame yet. Be the first to submit your score!
-              </div>
+              <div className="lb-loading">No scores yet. Submit your first score.</div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '500px' }}>
+              <table className="lb-table">
                 <thead>
-                  <tr style={{ borderBottom: '3px solid #667eea', paddingBottom: '10px' }}>
-                    <th style={{ padding: '15px 12px', color: '#495057', fontWeight: 700, fontSize: '1.05rem' }}>Rank</th>
-                    <th style={{ padding: '15px 12px', color: '#495057', fontWeight: 700, fontSize: '1.05rem' }}>Adventurer</th>
-                    <th style={{ padding: '15px 12px', color: '#495057', fontWeight: 700, fontSize: '1.05rem', textAlign: 'right' }}>Score</th>
-                    <th style={{ padding: '15px 12px', color: '#495057', fontWeight: 700, fontSize: '1.05rem', textAlign: 'right' }}>Date Completed</th>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Player</th>
+                    <th style={{ textAlign: 'right' }}>Score</th>
+                    <th style={{ textAlign: 'right' }}>Date</th>
                   </tr>
                 </thead>
                 <tbody>
                   {globalLeaderboard.map((entry, index) => {
-                    const isCurrentUser = progress.username && entry.name.toLowerCase() === progress.username.toLowerCase();
+                    const isMe = progress.username && entry.name.toLowerCase() === progress.username.toLowerCase();
                     const rank = index + 1;
-                    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
-
                     return (
-                      <tr 
-                        key={entry.id || index} 
-                        style={{ 
-                          borderBottom: '1px solid #e9ecef',
-                          backgroundColor: isCurrentUser ? 'rgba(102, 126, 234, 0.1)' : 'transparent',
-                          fontWeight: isCurrentUser ? '700' : '400',
-                          transition: 'all 0.2s ease',
-                          fontSize: '1.05rem'
-                        }}
-                      >
-                        <td style={{ padding: '18px 12px', fontWeight: rank <= 3 ? '700' : '400' }}>
-                          {medal ? <span style={{ fontSize: '1.3rem' }}>{medal}</span> : rank}
+                      <tr key={entry.id || index} className={isMe ? 'lb-row-me' : ''}>
+                        <td className="lb-rank">{rank}</td>
+                        <td>
+                          {entry.name}
+                          {isMe && <span className="lb-you-badge">YOU</span>}
                         </td>
-                        <td style={{ padding: '18px 12px', color: isCurrentUser ? '#764ba2' : '#333' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                            👤 {entry.name}
-                            {isCurrentUser && (
-                              <span style={{ 
-                                fontSize: '0.75rem', 
-                                background: 'linear-gradient(135deg, #667eea, #764ba2)', 
-                                color: 'white', 
-                                padding: '3px 8px', 
-                                borderRadius: '12px', 
-                                marginLeft: '8px',
-                                fontWeight: 'bold',
-                                boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                              }}>
-                                YOU
-                              </span>
-                            )}
-                          </span>
-                        </td>
-                        <td style={{ 
-                          padding: '18px 12px', 
-                          textAlign: 'right', 
-                          fontWeight: '800', 
-                          color: rank === 1 ? '#e6b800' : rank === 2 ? '#8e8e93' : rank === 3 ? '#a0522d' : '#4CAF50'
-                        }}>
-                          ⭐ {entry.score} pts
-                        </td>
-                        <td style={{ padding: '18px 12px', textAlign: 'right', color: '#6c757d', fontSize: '0.95rem' }}>
-                          📅 {entry.date}
-                        </td>
+                        <td className="lb-score-col">{entry.score} pts</td>
+                        <td className="lb-date-col">{entry.date}</td>
                       </tr>
                     );
                   })}
@@ -289,486 +148,361 @@ export default function Leaderboard() {
           </div>
         </section>
 
-        {/* Action Section */}
-        <section className="action-section">
-          <div className="action-buttons">
-            <button
-              onClick={() => navigate('/')}
-              className="home-button"
-            >
-              <span className="button-icon">🏠</span>
-              Back to Home
-            </button>
-            <button
-              onClick={handleContinueLearning}
-              className="continue-button"
-            >
-              <span className="button-icon">🎮</span>
-              Continue Learning
-            </button>
-          </div>
-        </section>
+        <div className="lb-actions">
+          <button onClick={() => navigate('/')} className="lb-action-btn lb-home-btn">Back to Home</button>
+          <button onClick={() => navigate('/')} className="lb-action-btn lb-continue-btn">Continue Learning</button>
+        </div>
       </main>
     </div>
   );
 }
 
-// CSS Styles
 const styles = `
-.leaderboard-container {
+.lb-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  font-family: 'Poppins', sans-serif;
-  padding-bottom: 40px;
+  background:
+    radial-gradient(circle at top left, rgba(22, 163, 74, 0.1), transparent 30rem),
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 32rem),
+    linear-gradient(135deg, #f8fbff 0%, #eef6ff 48%, #f7f4ff 100%);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #0f172a;
+  padding-bottom: 48px;
 }
 
-.leaderboard-header {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  padding: 25px 0;
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+.lb-header {
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid #e2e8f0;
+  padding: 20px 0;
   margin-bottom: 30px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
 }
 
-.header-content {
-  max-width: 1200px;
+.lb-header-inner {
+  max-width: 1100px;
   margin: 0 auto;
   padding: 0 20px;
-}
-
-.title-section {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 20px;
-  justify-content: center;
-  text-align: center;
+  gap: 16px;
 }
 
-.trophy-icon {
-  font-size: 3rem;
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
-}
-
-.title-section h1 {
+.lb-heading {
   margin: 0;
-  font-size: 2.2rem;
+  font-size: 1.9rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #1d4ed8, #16a34a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-.subtitle {
-  margin: 8px 0 0 0;
-  font-size: 1.1rem;
-  color: #666;
-  font-weight: 300;
+.lb-sub {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.95rem;
 }
 
-.leaderboard-main {
-  max-width: 1200px;
+.lb-back-btn,
+.lb-submit-btn,
+.lb-action-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.lb-back-btn,
+.lb-continue-btn,
+.lb-submit-btn {
+  background: #2563eb;
+  color: white;
+}
+
+.lb-back-btn:hover,
+.lb-continue-btn:hover,
+.lb-submit-btn:hover {
+  background: #1d4ed8;
+}
+
+.lb-main {
+  max-width: 1100px;
   margin: 0 auto;
   padding: 0 20px;
 }
 
-/* Overview Section - Medium Size Cards */
-.overview-section {
-  margin-bottom: 40px;
-}
-
-.overview-grid {
+.lb-overview {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  max-width: 800px;
-  margin: 0 auto;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+  margin-bottom: 36px;
 }
 
-.total-score-card, .highest-score-card, .completion-card {
-  background: white;
-  border-radius: 16px;
-  padding: 25px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+.lb-stat-card,
+.lb-cat-card,
+.lb-table-wrap {
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.lb-stat-card {
+  padding: 24px;
   text-align: center;
-  transition: transform 0.3s ease;
-}
-
-.total-score-card:hover, .highest-score-card:hover, .completion-card:hover {
-  transform: translateY(-5px);
-}
-
-.score-header {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  justify-content: center;
-  margin-bottom: 15px;
+  gap: 8px;
+  border-top: 5px solid #2563eb;
 }
 
-.score-icon {
-  font-size: 1.5rem;
+.lb-stat-card:nth-child(2) {
+  border-top-color: #d97706;
 }
 
-.score-header h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  color: #333;
-  font-weight: 600;
+.lb-stat-card:nth-child(3) {
+  border-top-color: #7c3aed;
 }
 
-.total-score-card .score-value {
-  font-size: 2.5rem;
+.lb-stat-val {
+  font-size: 2.3rem;
   font-weight: 800;
-  color: #4CAF50;
-  margin-bottom: 5px;
 }
 
-.score-max {
-  font-size: 1rem;
-  color: #666;
-  margin-bottom: 15px;
-}
-
-.progress-info {
-  margin-top: 10px;
-}
-
-.progress-text {
-  font-weight: 600;
-  color: #666;
+.lb-stat-lbl {
   font-size: 0.9rem;
-}
-
-.highest-value {
-  font-size: 2.2rem;
+  color: #475569;
   font-weight: 800;
-  color: #FF6B35;
-  margin-bottom: 15px;
 }
 
-.achievement-badge {
-  background: linear-gradient(135deg, #FF6B35, #FF8E53);
-  color: white;
-  padding: 6px 12px;
-  border-radius: 15px;
-  font-weight: 600;
-  font-size: 0.8rem;
-  display: inline-block;
-}
-
-.completion-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
-.stat-item {
-  text-align: center;
-}
-
-.stat-value {
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: #333;
-  margin-bottom: 5px;
-}
-
-.stat-label {
-  font-size: 0.8rem;
-  color: #666;
-  font-weight: 500;
-}
-
-.completion-text {
-  font-weight: 600;
-  color: #666;
-  font-size: 0.9rem;
-}
-
-/* Categories Section - Horizontal Layout */
-.categories-section {
-  margin-bottom: 40px;
-}
-
-.section-header {
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.section-header h2 {
-  margin: 0 0 10px 0;
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: white;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-}
-
-.section-header p {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 1rem;
-  font-weight: 300;
-}
-
-.categories-horizontal {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-.category-card-horizontal {
-  background: white;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-  transition: all 0.3s ease;
-  border: 2px solid transparent;
-}
-
-.category-card-horizontal:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
-  border-color: var(--card-color);
-}
-
-.card-main {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
-.category-icon-large {
-  font-size: 2.2rem;
-  flex-shrink: 0;
-}
-
-.category-info {
-  flex: 1;
-}
-
-.category-name {
-  margin: 0 0 5px 0;
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: #333;
-}
-
-.level-info {
+.lb-stat-extra {
   font-size: 0.85rem;
-  color: #666;
-  font-weight: 500;
+  color: #64748b;
+  font-weight: 600;
 }
 
-.score-display {
+.lb-badge {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.82rem;
+}
+
+.lb-section-title {
+  font-size: 1.35rem;
+  font-weight: 800;
   text-align: center;
-  flex-shrink: 0;
+  margin: 0 0 10px;
 }
 
-.score-number {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--card-color);
-  margin-bottom: 2px;
+.lb-section-sub {
+  text-align: center;
+  color: #64748b;
+  margin-bottom: 20px;
+  font-weight: 600;
 }
 
-.score-label {
-  font-size: 0.75rem;
-  color: #666;
-  font-weight: 500;
+.lb-categories {
+  margin-bottom: 40px;
 }
 
-.progress-section {
+.lb-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.lb-cat-card {
+  padding: 18px;
+  border-left: 4px solid var(--accent);
+}
+
+.lb-cat-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
-.progress-bar {
-  width: 100%;
-  height: 6px;
-  background: #f0f0f0;
-  border-radius: 3px;
-  overflow: hidden;
-  margin-bottom: 8px;
+.lb-cat-icon {
+  font-size: 0.88rem;
+  font-weight: 800;
 }
 
-.progress-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.5s ease;
+.lb-cat-info {
+  flex: 1;
 }
 
-.progress-text {
+.lb-cat-info h3 {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.lb-cat-levels {
   font-size: 0.8rem;
-  color: #666;
-  font-weight: 500;
+  color: #64748b;
+}
+
+.lb-cat-score {
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.lb-cat-score small {
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.lb-cat-bar-track {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.lb-cat-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.lb-cat-status {
   text-align: center;
 }
 
-.status-section {
+.lb-status-done,
+.lb-status-prog,
+.lb-status-new {
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.lb-status-done { background: #dcfce7; color: #166534; }
+.lb-status-prog { background: #dbeafe; color: #1e40af; }
+.lb-status-new { background: #f1f5f9; color: #475569; }
+
+.lb-hall {
+  margin-bottom: 34px;
+}
+
+.lb-table-wrap {
+  padding: 24px;
+  overflow-x: auto;
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.lb-loading {
   text-align: center;
-}
-
-.status {
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  display: inline-block;
-}
-
-.status.completed {
-  background: #E8F5E8;
-  color: #2E7D32;
-}
-
-.status.in-progress {
-  background: #E3F2FD;
-  color: #1565C0;
-}
-
-.status.not-started {
-  background: #FFF3E0;
-  color: #EF6C00;
-}
-
-/* Action Section */
-.action-section {
-  text-align: center;
-  margin-top: 30px;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 15px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.home-button, .continue-button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 28px;
-  border: none;
-  border-radius: 50px;
-  font-weight: 600;
+  padding: 34px;
   font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-decoration: none;
+  color: #64748b;
+  font-weight: 700;
 }
 
-.home-button {
-  background: white;
-  color: #333;
-  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.3);
+.lb-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 500px;
 }
 
-.continue-button {
-  background: linear-gradient(135deg, #4CAF50, #45a049);
+.lb-table thead tr {
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.lb-table th {
+  padding: 12px;
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: #475569;
+}
+
+.lb-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.95rem;
+}
+
+.lb-row-me {
+  background: #eff6ff;
+  font-weight: 700;
+}
+
+.lb-rank {
+  font-weight: 800;
+}
+
+.lb-you-badge {
+  font-size: 0.68rem;
+  background: #2563eb;
   color: white;
-  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
+  padding: 2px 7px;
+  border-radius: 999px;
+  margin-left: 8px;
+  font-weight: 800;
 }
 
-.home-button:hover, .continue-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+.lb-score-col {
+  text-align: right;
+  font-weight: 800;
+  color: #16a34a;
 }
 
-.button-icon {
-  font-size: 1.1rem;
+.lb-date-col {
+  text-align: right;
+  color: #64748b;
+  font-size: 0.88rem;
 }
 
-/* Responsive Design */
-@media (max-width: 1024px) {
-  .categories-horizontal {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
-  }
+.lb-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 26px;
+}
+
+.lb-home-btn {
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+.lb-home-btn:hover {
+  background: #f8fafc;
 }
 
 @media (max-width: 768px) {
-  .leaderboard-header {
-    padding: 20px 0;
-    margin-bottom: 20px;
-  }
-  
-  .title-section {
+  .lb-header-inner {
     flex-direction: column;
-    gap: 15px;
     text-align: center;
   }
-  
-  .title-section h1 {
-    font-size: 1.8rem;
-  }
-  
-  .trophy-icon {
-    font-size: 2.5rem;
-  }
-  
-  .overview-grid {
-    grid-template-columns: 1fr;
-    gap: 15px;
-    max-width: 400px;
-  }
-  
-  .categories-horizontal {
-    grid-template-columns: 1fr;
-    max-width: 400px;
-  }
-  
-  .section-header h2 {
-    font-size: 1.5rem;
-  }
-  
-  .action-buttons {
-    flex-direction: column;
-    align-items: center;
-  }
-  
-  .home-button, .continue-button {
-    width: 100%;
-    max-width: 300px;
-    justify-content: center;
-  }
-}
 
-@media (max-width: 480px) {
-  .leaderboard-main {
-    padding: 0 15px;
+  .lb-heading {
+    font-size: 1.6rem;
   }
-  
-  .total-score-card, .highest-score-card, .completion-card, .category-card-horizontal {
-    padding: 20px;
-  }
-  
-  .total-score-card .score-value {
-    font-size: 2rem;
-  }
-  
-  .highest-value {
-    font-size: 1.8rem;
-  }
-  
-  .card-main {
-    flex-direction: column;
-    text-align: center;
-    gap: 10px;
-  }
-  
-  .category-info {
-    text-align: center;
+
+  .lb-overview,
+  .lb-cat-grid {
+    grid-template-columns: 1fr;
   }
 }
 `;
 
-// Add styles to document
 if (typeof document !== 'undefined') {
-  const styleSheet = document.createElement("style");
-  styleSheet.innerText = styles;
-  document.head.appendChild(styleSheet);
+  const existing = document.getElementById("lb-styles");
+  if (existing) existing.remove();
+  const s = document.createElement("style");
+  s.id = "lb-styles";
+  s.innerText = styles;
+  document.head.appendChild(s);
 }

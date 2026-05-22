@@ -3,11 +3,198 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/triviatrek';
+
+const formatScoreTimestamp = () => new Date().toLocaleString(undefined, {
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit'
+});
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const dedupeLeaderboardRows = (rows) => {
+  const byName = new Map();
+
+  for (const row of rows) {
+    const key = row.name?.toLowerCase();
+    if (!key) continue;
+
+    const existing = byName.get(key);
+    if (!existing || Number(row.score) > Number(existing.score)) {
+      byName.set(key, row);
+    }
+  }
+
+  return [...byName.values()]
+    .sort((a, b) => Number(b.score) - Number(a.score))
+    .slice(0, 10);
+};
+
+const createInitialCategoryProgress = () => {
+  return QUIZ_CATEGORIES.reduce((acc, category) => {
+    acc[category.slug] = { passed: [], score: 0 };
+    return acc;
+  }, {});
+};
+
+const buildLevels = (questions) => questions.map((item, index) => ({
+  level: index + 1,
+  question: item.question,
+  options: item.options,
+  answer: item.answer,
+  hint: item.hint
+}));
+
+const QUIZ_CATEGORIES = [
+  {
+    slug: 'science',
+    name: 'Java Programming Quiz',
+    legacyName: 'Science',
+    label: 'JAVA',
+    color: '#E0F2FE',
+    iconColor: '#0284C7',
+    description: 'Practice Java basics, OOP, collections, and syntax.',
+    levels: buildLevels([
+      { question: 'In Java, which keyword is used to create a class?', options: ['class', 'struct', 'define', 'object'], answer: 'class', hint: 'Every Java program commonly starts by declaring this type.' },
+      { question: 'Which method is the standard entry point of a Java application?', options: ['main', 'start', 'run', 'init'], answer: 'main', hint: 'It is usually written as public static void main.' },
+      { question: 'Which Java keyword creates an object instance?', options: ['new', 'make', 'create', 'malloc'], answer: 'new', hint: 'It calls a constructor.' },
+      { question: 'Which Java type stores true or false values?', options: ['boolean', 'bool', 'bit', 'truth'], answer: 'boolean', hint: 'Java uses the full word, not bool.' },
+      { question: 'Which Java collection stores key-value pairs?', options: ['HashMap', 'ArrayList', 'Stack', 'StringBuilder'], answer: 'HashMap', hint: 'It maps keys to values.' }
+    ])
+  },
+  {
+    slug: 'jungle',
+    name: 'C Programming Quiz',
+    legacyName: 'Jungle',
+    label: 'C',
+    color: '#DCFCE7',
+    iconColor: '#16A34A',
+    description: 'Review C fundamentals, pointers, memory, and printf.',
+    levels: buildLevels([
+      { question: 'Which function is the entry point of a C program?', options: ['main', 'start', 'init', 'program'], answer: 'main', hint: 'Execution begins from this function.' },
+      { question: 'Which header file is needed for printf?', options: ['stdio.h', 'stdlib.h', 'string.h', 'math.h'], answer: 'stdio.h', hint: 'It stands for standard input/output.' },
+      { question: 'Which operator gives the address of a variable in C?', options: ['&', '*', '%', '#'], answer: '&', hint: 'It is also called the address-of operator.' },
+      { question: 'Which function is commonly used to allocate memory dynamically in C?', options: ['malloc', 'new', 'allocObject', 'memory'], answer: 'malloc', hint: 'It comes from stdlib.h.' },
+      { question: 'Which format specifier prints an integer using printf?', options: ['%d', '%s', '%f', '%c'], answer: '%d', hint: 'It is used for decimal integers.' }
+    ])
+  },
+  {
+    slug: 'math',
+    name: 'C++ Programming Quiz',
+    legacyName: 'Math',
+    label: 'C++',
+    color: '#EEF2FF',
+    iconColor: '#4F46E5',
+    description: 'Practice C++ OOP, STL, scope, and dynamic allocation.',
+    levels: buildLevels([
+      { question: 'Which C++ feature allows multiple functions to share the same name with different parameters?', options: ['Function overloading', 'Inheritance', 'Encapsulation', 'Namespace locking'], answer: 'Function overloading', hint: 'The compiler chooses based on the parameter list.' },
+      { question: 'Which C++ keyword is used to create a class object dynamically?', options: ['new', 'malloc', 'make', 'object'], answer: 'new', hint: 'It calls the constructor and returns a pointer.' },
+      { question: 'Which standard library container is a dynamic array?', options: ['vector', 'map', 'set', 'queue'], answer: 'vector', hint: 'It grows as elements are added.' },
+      { question: 'Which concept lets a derived class reuse a base class?', options: ['Inheritance', 'Compilation', 'Tokenization', 'Linking'], answer: 'Inheritance', hint: 'It models an is-a relationship.' },
+      { question: 'Which operator is used for scope resolution in C++?', options: ['::', '->', '.', '&&'], answer: '::', hint: 'It is used with namespaces and class members.' }
+    ])
+  },
+  {
+    slug: 'history',
+    name: 'Python Programming Quiz',
+    legacyName: 'History',
+    label: 'PY',
+    color: '#FEF3C7',
+    iconColor: '#D97706',
+    description: 'Learn Python functions, lists, dictionaries, and modules.',
+    levels: buildLevels([
+      { question: 'Which keyword defines a function in Python?', options: ['def', 'func', 'function', 'lambda-only'], answer: 'def', hint: 'It appears before the function name.' },
+      { question: 'Which Python data type stores key-value pairs?', options: ['dict', 'list', 'tuple', 'set-only'], answer: 'dict', hint: 'It is short for dictionary.' },
+      { question: 'Which keyword is used to handle exceptions in Python?', options: ['try', 'check', 'guard', 'catch-only'], answer: 'try', hint: 'It is usually paired with except.' },
+      { question: 'Which method adds an item to the end of a Python list?', options: ['append', 'push', 'addLast', 'insertEnd'], answer: 'append', hint: 'It is called on the list object.' },
+      { question: 'Which Python statement imports a module?', options: ['import', 'include', 'require', 'using'], answer: 'import', hint: 'It loads modules such as math or os.' }
+    ])
+  },
+  {
+    slug: 'html',
+    name: 'HTML Programming Quiz',
+    label: 'HTML',
+    color: '#FFEDD5',
+    iconColor: '#EA580C',
+    description: 'Practice semantic HTML elements, forms, links, and images.',
+    levels: buildLevels([
+      { question: 'Which HTML element is used for the main heading on a page?', options: ['<h1>', '<head>', '<title>', '<header-only>'], answer: '<h1>', hint: 'It is the largest semantic heading element.' },
+      { question: 'Which attribute provides alternate text for an image?', options: ['alt', 'src', 'href', 'title-only'], answer: 'alt', hint: 'Screen readers use this when describing an image.' },
+      { question: 'Which tag creates a clickable hyperlink?', options: ['<a>', '<link>', '<button-link>', '<href>'], answer: '<a>', hint: 'It usually uses an href attribute.' },
+      { question: 'Which HTML element is best for a numbered list?', options: ['<ol>', '<ul>', '<li-only>', '<list>'], answer: '<ol>', hint: 'The letter o stands for ordered.' },
+      { question: 'Which input type should be used for an email field?', options: ['email', 'mailbox', 'text-email', 'address'], answer: 'email', hint: 'Browsers can validate this format automatically.' }
+    ])
+  },
+  {
+    slug: 'css',
+    name: 'CSS Programming Quiz',
+    label: 'CSS',
+    color: '#DBEAFE',
+    iconColor: '#2563EB',
+    description: 'Practice selectors, layout, spacing, and CSS units.',
+    levels: buildLevels([
+      { question: 'Which CSS property changes text color?', options: ['color', 'font-color', 'text-paint', 'foreground'], answer: 'color', hint: 'It directly controls the foreground text color.' },
+      { question: 'Which CSS property controls the space inside an element border?', options: ['padding', 'margin', 'gap', 'outline'], answer: 'padding', hint: 'Margin is outside; this one is inside.' },
+      { question: 'Which display value enables flexbox layout?', options: ['flex', 'grid-flex', 'inline-grid', 'block-flex'], answer: 'flex', hint: 'Use display with this value.' },
+      { question: "Which selector targets an element with id='app'?", options: ['#app', '.app', 'app', '*app'], answer: '#app', hint: 'IDs use the hash symbol.' },
+      { question: 'Which unit is relative to the root element font size?', options: ['rem', 'px', 'vh', 'percent-only'], answer: 'rem', hint: 'It means root em.' }
+    ])
+  },
+  {
+    slug: 'react',
+    name: 'React Programming Quiz',
+    label: 'RCT',
+    color: '#E0F2FE',
+    iconColor: '#0891B2',
+    description: 'Practice React hooks, props, JSX, effects, and rendering.',
+    levels: buildLevels([
+      { question: 'Which React hook stores component state?', options: ['useState', 'useRoute', 'useClass', 'useStyle'], answer: 'useState', hint: 'It returns a value and a setter function.' },
+      { question: 'What syntax lets React describe UI inside JavaScript?', options: ['JSX', 'SQL', 'YAML', 'Bash'], answer: 'JSX', hint: 'It looks like HTML, but lives in JavaScript.' },
+      { question: 'Which prop is required when rendering lists of elements?', options: ['key', 'idOnly', 'indexOnly', 'name'], answer: 'key', hint: 'React uses it to identify list items efficiently.' },
+      { question: 'Which hook runs side effects after render?', options: ['useEffect', 'useState', 'useMemoOnly', 'useEventLoop'], answer: 'useEffect', hint: 'It is commonly used for fetching data or subscriptions.' },
+      { question: 'In React, data passed from parent to child components is called what?', options: ['props', 'signals', 'packets', 'exports'], answer: 'props', hint: 'Short for properties.' }
+    ])
+  },
+  {
+    slug: 'nodejs',
+    name: 'NodeJs Programming Quiz',
+    label: 'NODE',
+    color: '#DCFCE7',
+    iconColor: '#15803D',
+    description: 'Practice Node.js runtime, modules, npm, and backend basics.',
+    levels: buildLevels([
+      { question: 'Which runtime lets JavaScript run outside the browser?', options: ['Node.js', 'HTML', 'CSS', 'MongoDB'], answer: 'Node.js', hint: 'It is commonly used for backend JavaScript.' },
+      { question: 'Which file usually stores Node.js project dependencies?', options: ['package.json', 'index.html', 'style.css', 'README.only'], answer: 'package.json', hint: 'npm reads this file.' },
+      { question: 'Which command installs dependencies listed in package.json?', options: ['npm install', 'node install', 'npm build-only', 'install node_modules'], answer: 'npm install', hint: 'It creates or updates node_modules.' },
+      { question: 'Which built-in Node.js module is used to work with file paths?', options: ['path', 'route', 'url-only', 'folder'], answer: 'path', hint: 'It provides utilities like join and resolve.' },
+      { question: 'What object does CommonJS use to expose values from a module?', options: ['module.exports', 'window.export', 'public.module', 'return.exports'], answer: 'module.exports', hint: 'You often see require used with this module system.' }
+    ])
+  },
+  {
+    slug: 'dsa',
+    name: 'DSA Programming Quiz',
+    label: 'DSA',
+    color: '#F3E8FF',
+    iconColor: '#9333EA',
+    description: 'Practice data structures, Big O, trees, stacks, and sorting.',
+    levels: buildLevels([
+      { question: 'Which data structure follows Last In, First Out?', options: ['Stack', 'Queue', 'Tree', 'Graph'], answer: 'Stack', hint: 'Think of plates stacked on top of each other.' },
+      { question: 'Which data structure follows First In, First Out?', options: ['Queue', 'Stack', 'Heap', 'Set'], answer: 'Queue', hint: 'Think of people waiting in line.' },
+      { question: 'What is the average lookup time for a hash table?', options: ['O(1)', 'O(n)', 'O(log n)', 'O(n log n)'], answer: 'O(1)', hint: 'Hashing aims for constant time access.' },
+      { question: 'Which traversal visits left subtree, root, then right subtree?', options: ['Inorder', 'Preorder', 'Postorder', 'Levelorder'], answer: 'Inorder', hint: 'The root is visited in the middle.' },
+      { question: 'Which sorting algorithm repeatedly selects the smallest remaining item?', options: ['Selection Sort', 'Merge Sort', 'Quick Sort', 'Radix Sort'], answer: 'Selection Sort', hint: 'Its name describes choosing an item each pass.' }
+    ])
+  }
+];
 
 app.use(cors());
 app.use(express.json());
@@ -20,10 +207,10 @@ if (!fs.existsSync(FALLBACK_DB_PATH)) {
   const initialData = {
     users: [],
     leaderboard: [
-      { id: 1, name: "AlphaExplorer", score: 400, date: new Date().toLocaleDateString() },
-      { id: 2, name: "QuizMaster", score: 320, date: new Date().toLocaleDateString() },
-      { id: 3, name: "JungleJane", score: 260, date: new Date().toLocaleDateString() },
-      { id: 4, name: "HistoryBuff", score: 200, date: new Date().toLocaleDateString() }
+      { id: 1, name: "AlphaExplorer", score: 400, date: formatScoreTimestamp() },
+      { id: 2, name: "QuizMaster", score: 320, date: formatScoreTimestamp() },
+      { id: 3, name: "JungleJane", score: 260, date: formatScoreTimestamp() },
+      { id: 4, name: "HistoryBuff", score: 200, date: formatScoreTimestamp() }
     ],
     progress: []
   };
@@ -59,10 +246,31 @@ mongoose.connect(MONGODB_URI, {
   useUnifiedTopology: true,
   serverSelectionTimeoutMS: 5000 // 5 seconds timeout
 })
-.then(() => {
+.then(async () => {
   console.log('✅ Connected to MongoDB database successfully at ' + MONGODB_URI);
   isMongoDBConnected = true;
+
+  // Drop stale indexes that don't match current schema
+  try {
+    const usersCollection = mongoose.connection.collection('users');
+    const indexes = await usersCollection.indexes();
+    for (const idx of indexes) {
+      if (idx.key && idx.key.email !== undefined) {
+        console.log('🧹 Dropping stale email index from users collection...');
+        await usersCollection.dropIndex(idx.name);
+        console.log('✅ Stale email index removed successfully.');
+      }
+    }
+  } catch (e) {
+    // Ignore if index doesn't exist
+    if (e.codeName !== 'IndexNotFound') {
+      console.log('Note: Could not clean stale indexes:', e.message);
+    }
+  }
+
   seedDefaultData();
+  seedQuizData();
+  cleanupDuplicateLeaderboardEntries();
 })
 .catch(err => {
   console.log('\n⚠️  MongoDB Connection Failed!');
@@ -76,11 +284,20 @@ mongoose.connect(MONGODB_URI, {
 // --- MongoDB / Mongoose Schemas ---
 const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
   createdAt: { type: Date, default: Date.now }
 });
 
 const ProgressSchema = new mongoose.Schema({
   userId: { type: String, required: true, unique: true },
+  categories: {
+    type: Map,
+    of: new mongoose.Schema({
+      passed: { type: [Number], default: [] },
+      score: { type: Number, default: 0 }
+    }, { _id: false }),
+    default: {}
+  },
   science: {
     passed: { type: [Number], default: [] },
     score: { type: Number, default: 0 }
@@ -107,9 +324,30 @@ const LeaderboardSchema = new mongoose.Schema({
   id: { type: Number, unique: true, required: true }
 });
 
+const QuizLevelSchema = new mongoose.Schema({
+  level: { type: Number, required: true },
+  question: { type: String, required: true },
+  options: { type: [String], required: true },
+  answer: { type: String, required: true },
+  hint: { type: String, default: '' },
+  image: { type: String, default: '' }
+}, { _id: false });
+
+const QuizCategorySchema = new mongoose.Schema({
+  slug: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  legacyName: { type: String, default: '' },
+  label: { type: String, required: true },
+  color: { type: String, required: true },
+  iconColor: { type: String, required: true },
+  description: { type: String, required: true },
+  levels: { type: [QuizLevelSchema], default: [] }
+});
+
 const User = mongoose.models.User || mongoose.model('User', UserSchema);
 const Progress = mongoose.models.Progress || mongoose.model('Progress', ProgressSchema);
 const Leaderboard = mongoose.models.Leaderboard || mongoose.model('Leaderboard', LeaderboardSchema);
+const QuizCategory = mongoose.models.QuizCategory || mongoose.model('QuizCategory', QuizCategorySchema);
 
 // Seed default data to MongoDB if connected and empty
 async function seedDefaultData() {
@@ -126,7 +364,194 @@ async function seedDefaultData() {
   }
 }
 
+async function seedQuizData() {
+  try {
+    for (const category of QUIZ_CATEGORIES) {
+      await QuizCategory.findOneAndUpdate(
+        { slug: category.slug },
+        category,
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    }
+    console.log(`Quiz categories synced to MongoDB: ${QUIZ_CATEGORIES.length}`);
+  } catch (err) {
+    console.error('Error seeding quiz categories:', err);
+  }
+}
+
+async function cleanupDuplicateLeaderboardEntries() {
+  try {
+    const rows = await Leaderboard.find().sort({ score: -1, _id: 1 });
+    const keepByName = new Map();
+    const duplicateIds = [];
+
+    for (const row of rows) {
+      const key = row.name?.toLowerCase();
+      if (!key) continue;
+
+      if (keepByName.has(key)) {
+        duplicateIds.push(row._id);
+      } else {
+        keepByName.set(key, row._id);
+      }
+    }
+
+    if (duplicateIds.length > 0) {
+      await Leaderboard.deleteMany({ _id: { $in: duplicateIds } });
+      console.log(`Cleaned ${duplicateIds.length} duplicate leaderboard row(s).`);
+    }
+  } catch (err) {
+    console.error('Error cleaning duplicate leaderboard entries:', err);
+  }
+}
+
+// --- SECURE AUTHENTICATION ENDPOINTS ---
+
+app.post('/auth/signup', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
+  if (isMongoDBConnected) {
+    try {
+      const existingUser = await User.findOne({ username });
+      if (existingUser) {
+        return res.status(400).json({ error: 'Username is already taken' });
+      }
+
+      // Hash password securely
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const newUser = new User({ username, password: hashedPassword });
+      await newUser.save();
+
+      // Create new blank progress for user
+      const newProgress = new Progress({
+        userId: newUser._id.toString(),
+        categories: createInitialCategoryProgress(),
+        science: { passed: [], score: 0 },
+        jungle: { passed: [], score: 0 },
+        math: { passed: [], score: 0 },
+        history: { passed: [], score: 0 },
+        highestScore: 0
+      });
+      await newProgress.save();
+
+      res.status(201).json({
+        success: true,
+        userId: newUser._id.toString(),
+        username: newUser.username
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    // Resilient Fallback Database Mode
+    const data = readFallbackData();
+    const existingUser = data.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    if (existingUser) {
+      return res.status(400).json({ error: 'Username is already taken' });
+    }
+
+    const userId = 'offline_' + Date.now();
+    const newUser = { id: userId, username, password }; // plain-text or simplified storage for offline testing
+    data.users.push(newUser);
+
+    const newProgress = {
+      id: Date.now().toString(),
+      userId: userId,
+      categories: createInitialCategoryProgress(),
+      science: { passed: [], score: 0 },
+      jungle: { passed: [], score: 0 },
+      math: { passed: [], score: 0 },
+      history: { passed: [], score: 0 },
+      highestScore: 0
+    };
+    data.progress.push(newProgress);
+
+    writeFallbackData(data);
+    res.status(201).json({
+      success: true,
+      userId,
+      username
+    });
+  }
+});
+
+app.post('/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
+  if (isMongoDBConnected) {
+    try {
+      const user = await User.findOne({ username });
+      if (!user) {
+        return res.status(400).json({ error: 'Invalid username or password' });
+      }
+
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ error: 'Invalid username or password' });
+      }
+
+      res.json({
+        success: true,
+        userId: user._id.toString(),
+        username: user.username
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    // Resilient Fallback Database Mode
+    const data = readFallbackData();
+    const user = data.users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid username or password' });
+    }
+
+    res.json({
+      success: true,
+      userId: user.id,
+      username: user.username
+    });
+  }
+});
+
 // --- EXPRESS API ROUTES ---
+
+app.get('/quiz-categories', async (req, res) => {
+  if (isMongoDBConnected) {
+    try {
+      const categories = await QuizCategory.find().sort({ _id: 1 });
+      return res.json(categories);
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  return res.json(QUIZ_CATEGORIES);
+});
+
+app.get('/quiz-categories/:slug', async (req, res) => {
+  const { slug } = req.params;
+
+  if (isMongoDBConnected) {
+    try {
+      const category = await QuizCategory.findOne({ slug });
+      if (!category) return res.status(404).json({ error: 'Quiz category not found' });
+      return res.json(category);
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  const category = QUIZ_CATEGORIES.find(item => item.slug === slug);
+  if (!category) return res.status(404).json({ error: 'Quiz category not found' });
+  return res.json(category);
+});
 
 // 1. User Management CRUD
 app.get('/users', async (req, res) => {
@@ -336,18 +761,14 @@ app.delete('/progress/:id', async (req, res) => {
 app.get('/leaderboard', async (req, res) => {
   if (isMongoDBConnected) {
     try {
-      // Default: sort by score descending
-      const leaderboard = await Leaderboard.find().sort({ score: -1 }).limit(10);
-      res.json(leaderboard);
+      const leaderboard = await Leaderboard.find().sort({ score: -1 });
+      res.json(dedupeLeaderboardRows(leaderboard));
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   } else {
     const data = readFallbackData();
-    const sorted = [...data.leaderboard]
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 10);
-    res.json(sorted);
+    res.json(dedupeLeaderboardRows(data.leaderboard));
   }
 });
 
@@ -357,27 +778,91 @@ app.post('/leaderboard', async (req, res) => {
     return res.status(400).json({ error: 'Name and score are required' });
   }
 
+  const normalizedName = entry.name.trim();
+  if (!normalizedName) {
+    return res.status(400).json({ error: 'Name is required' });
+  }
+
+  const score = Number(entry.score);
+  if (!Number.isFinite(score)) {
+    return res.status(400).json({ error: 'Score must be a valid number' });
+  }
+
   // Ensure entry has an id
   if (!entry.id) {
     entry.id = Date.now() + Math.floor(Math.random() * 1000);
   }
   if (!entry.date) {
-    entry.date = new Date().toLocaleDateString();
+    entry.date = formatScoreTimestamp();
   }
 
   if (isMongoDBConnected) {
     try {
-      const newEntry = new Leaderboard(entry);
+      const existingEntries = await Leaderboard.find({
+        name: new RegExp(`^${escapeRegExp(normalizedName)}$`, 'i')
+      }).sort({ score: -1, _id: 1 });
+
+      if (existingEntries.length > 0) {
+        const [primaryEntry, ...duplicateEntries] = existingEntries;
+
+        primaryEntry.score = score;
+        primaryEntry.date = entry.date;
+        await primaryEntry.save();
+
+        if (duplicateEntries.length > 0) {
+          await Leaderboard.deleteMany({
+            _id: { $in: duplicateEntries.map(item => item._id) }
+          });
+        }
+
+        return res.json(primaryEntry);
+      }
+
+      const newEntry = new Leaderboard({
+        name: normalizedName,
+        score,
+        date: entry.date,
+        id: entry.id
+      });
       await newEntry.save();
-      res.status(201).json(newEntry);
+      return res.status(201).json(newEntry);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message });
     }
   } else {
     const data = readFallbackData();
-    data.leaderboard.push(entry);
+    const existingEntries = data.leaderboard.filter(
+      item => item.name?.toLowerCase() === normalizedName.toLowerCase()
+    );
+
+    if (existingEntries.length > 0) {
+      const primaryEntry = existingEntries
+        .sort((a, b) => Number(b.score) - Number(a.score))[0];
+      const updatedEntry = {
+        ...primaryEntry,
+        score,
+        date: entry.date
+      };
+
+      data.leaderboard = [
+        ...data.leaderboard.filter(
+          item => item.name?.toLowerCase() !== normalizedName.toLowerCase()
+        ),
+        updatedEntry
+      ];
+      writeFallbackData(data);
+      return res.json(updatedEntry);
+    }
+
+    const createdEntry = {
+      name: normalizedName,
+      score,
+      date: entry.date,
+      id: entry.id
+    };
+    data.leaderboard.push(createdEntry);
     writeFallbackData(data);
-    res.status(201).json(entry);
+    return res.status(201).json(createdEntry);
   }
 });
 
@@ -405,6 +890,12 @@ app.put('/leaderboard/:id', async (req, res) => {
     }
   }
 });
+
+/*
+ * Keep this file's leaderboard behavior one-row-per-user:
+ * POST /leaderboard creates a row for a new name, or updates score/date for
+ * an existing name and removes older duplicate rows for that same name.
+ */
 
 // Start Express Server
 app.listen(PORT, () => {

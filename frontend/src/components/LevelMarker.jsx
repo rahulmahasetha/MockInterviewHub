@@ -1,253 +1,114 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-export default function LevelMarker({ level, locked, completed, current, pulsing, onClick, style, category }) {
-  const [isHovered, setIsHovered] = useState(false);
-  const [shouldAnimate, setShouldAnimate] = useState(false);
-
-  useEffect(() => {
-    // Trigger entrance animation
-    const timer = setTimeout(() => setShouldAnimate(true), level * 100);
-    return () => clearTimeout(timer);
-  }, [level]);
-
+export default function LevelMarker({ level, locked, completed, current, onClick, style, category }) {
   const getMarkerClass = () => {
     let className = 'level-marker';
     if (locked) className += ' locked';
     if (completed) className += ' completed';
     if (current) className += ' current';
-    if (pulsing) className += ' pulsing';
-    if (isHovered && !locked) className += ' hovered';
-    if (shouldAnimate) className += ' animated';
     return className;
   };
 
   const getMarkerContent = () => {
-    if (locked) return '🔒';
-    if (completed) return '✓';
+    if (locked) return 'L';
+    if (completed) return 'OK';
     return level;
   };
 
   const getTooltipText = () => {
     if (locked) return 'Complete previous level to unlock';
-    if (completed) return `Level ${level} - Completed!`;
-    if (current) return `Level ${level} - Current`;
-    return `Level ${level} - Click to play`;
+    if (completed) return `Level ${level} completed`;
+    if (current) return `Level ${level} current`;
+    return `Level ${level}`;
   };
 
   return (
     <>
-      <div
+      <button
+        type="button"
         className={getMarkerClass()}
         title={getTooltipText()}
         onClick={!locked ? onClick : undefined}
-        onMouseEnter={() => !locked && setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        style={{...style}}
-        data-level={level}
+        style={{ ...style }}
         data-category={category}
+        disabled={locked}
       >
         {getMarkerContent()}
-        
-        {/* Glow effect for pulsing markers */}
-        {pulsing && <div className="pulse-ring"></div>}
-        
-        {/* Hover effect trail */}
-        {isHovered && <div className="hover-trail"></div>}
-      </div>
+      </button>
 
-      <style jsx>{`
+      <style>{`
         .level-marker {
           position: absolute;
-          width: 50px;
-          height: 50px;
-          border-radius: 50%;
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-weight: bold;
+          font-weight: 800;
           cursor: pointer;
-          transform: scale(0);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
           z-index: 10;
-          font-size: 1.1rem;
-          border: 3px solid transparent;
-          background: linear-gradient(135deg, #667eea, #764ba2);
+          font-size: 0.95rem;
+          border: 2px solid #ffffff;
+          background: #2563eb;
           color: white;
-          animation: markerEntrance 0.6s ease-out forwards;
-          animation-delay: ${level * 0.1}s;
         }
 
-        .level-marker.animated {
-          transform: scale(1);
+        .level-marker:hover:not(:disabled) {
+          background: #1d4ed8;
+        }
+
+        .level-marker:focus-visible {
+          outline: 3px solid rgba(37, 99, 235, 0.3);
+          outline-offset: 3px;
         }
 
         .level-marker.locked {
-          background: #9e9e9e;
+          background: #94a3b8;
           cursor: not-allowed;
-          transform: scale(0.8);
-          animation: shake 0.5s ease-in-out;
+          color: #f8fafc;
         }
 
         .level-marker.completed {
-          background: #4CAF50;
-          animation: completedGlow 2s ease-in-out infinite;
+          background: #16a34a;
         }
 
         .level-marker.current {
-          background: #2196F3;
-          border-color: #FFD700;
-          animation: currentPulse 2s ease-in-out infinite;
+          background: #0f172a;
+          border-color: #93c5fd;
         }
 
-        .level-marker.pulsing {
-          animation: suggestPulse 1.5s ease-in-out infinite;
-        }
-
-        .level-marker.hovered:not(.locked) {
-          transform: scale(1.2) translateY(-5px);
-          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-          z-index: 20;
-        }
-
-        /* Pulse ring for suggested levels */
-        .pulse-ring {
-          position: absolute;
-          width: 70px;
-          height: 70px;
-          border: 2px solid #FF9800;
-          border-radius: 50%;
-          animation: ringPulse 2s ease-out infinite;
-          pointer-events: none;
-        }
-
-        /* Hover trail effect */
-        .hover-trail {
-          position: absolute;
-          width: 70px;
-          height: 70px;
-          border: 2px solid rgba(255, 255, 255, 0.6);
-          border-radius: 50%;
-          animation: trailExpand 0.6s ease-out forwards;
-          pointer-events: none;
-        }
-
-        /* Animations */
-        @keyframes markerEntrance {
-          0% {
-            transform: scale(0) rotate(-180deg);
-            opacity: 0;
-          }
-          70% {
-            transform: scale(1.1) rotate(10deg);
-          }
-          100% {
-            transform: scale(1) rotate(0deg);
-            opacity: 1;
-          }
-        }
-
-        @keyframes completedGlow {
-          0%, 100% {
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
-          }
-          50% {
-            box-shadow: 0 4px 20px rgba(76, 175, 80, 0.8), 0 0 30px rgba(76, 175, 80, 0.6);
-          }
-        }
-
-        @keyframes currentPulse {
-          0%, 100% {
-            transform: scale(1);
-            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.4);
-          }
-          50% {
-            transform: scale(1.1);
-            box-shadow: 0 4px 20px rgba(33, 150, 243, 0.8), 0 0 30px rgba(33, 150, 243, 0.6);
-          }
-        }
-
-        @keyframes suggestPulse {
-          0%, 100% {
-            transform: scale(1);
-            background: linear-gradient(135deg, #FF9800, #FF5722);
-          }
-          50% {
-            transform: scale(1.15);
-            background: linear-gradient(135deg, #FFB74D, #FF9800);
-            box-shadow: 0 0 25px rgba(255, 152, 0, 0.8);
-          }
-        }
-
-        @keyframes ringPulse {
-          0% {
-            transform: scale(0.8);
-            opacity: 1;
-          }
-          100% {
-            transform: scale(1.5);
-            opacity: 0;
-          }
-        }
-
-        @keyframes trailExpand {
-          0% {
-            transform: scale(1);
-            opacity: 1;
-          }
-          100% {
-            transform: scale(1.5);
-            opacity: 0;
-          }
-        }
-
-        @keyframes shake {
-          0%, 100% { transform: translateX(0) scale(0.8); }
-          25% { transform: translateX(-3px) scale(0.8); }
-          75% { transform: translateX(3px) scale(0.8); }
-        }
-
-        /* Category-specific colors */
         .level-marker[data-category="science"]:not(.locked):not(.completed):not(.current) {
-          background: linear-gradient(135deg, #4CAF50, #45a049);
+          background: #0f766e;
         }
 
         .level-marker[data-category="jungle"]:not(.locked):not(.completed):not(.current) {
-          background: linear-gradient(135deg, #FF9800, #F57C00);
+          background: #15803d;
         }
 
         .level-marker[data-category="math"]:not(.locked):not(.completed):not(.current) {
-          background: linear-gradient(135deg, #2196F3, #1976D2);
+          background: #2563eb;
         }
 
         .level-marker[data-category="history"]:not(.locked):not(.completed):not(.current) {
-          background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+          background: #7c3aed;
         }
 
-        /* Responsive adjustments */
         @media (max-width: 768px) {
           .level-marker {
-            width: 40px;
-            height: 40px;
-            font-size: 0.9rem;
-          }
-          
-          .pulse-ring {
-            width: 55px;
-            height: 55px;
-          }
-          
-          .hover-trail {
-            width: 55px;
-            height: 55px;
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            font-size: 0.82rem;
           }
         }
 
         @media (max-width: 480px) {
           .level-marker {
-            width: 35px;
-            height: 35px;
-            font-size: 0.8rem;
+            width: 34px;
+            height: 34px;
+            font-size: 0.75rem;
           }
         }
       `}</style>

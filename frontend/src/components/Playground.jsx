@@ -3,63 +3,55 @@ import { useParams, useNavigate } from 'react-router-dom';
 import LevelMarker from './LevelMarker';
 import MCQCard from './MCQCard';
 import { useUserProgress } from '../context/UserProgressContext';
-
-import dataScience from '../data/science.json';
-import dataJungle from '../data/jungle.json';
-import dataMath from '../data/math.json';
-import dataHistory from '../data/history.json';
+import { quizAPI } from '../services/api';
 
 import scienceMap from '../assets/maps/scienceMap.png';
-import jungleMap from '../assets/maps/scienceMap2.png';
-import mathMap from '../assets/maps/scienceMap2.png';
-import historyMap from '../assets/maps/scienceMap2.png';
 
-const mapByCategory = {
-  science: scienceMap,
-  jungle: jungleMap,
-  math: mathMap,
-  history: historyMap
-};
-
-const categoryColors = {
-  science: '#4CAF50',
-  jungle: '#FF9800',
-  math: '#2196F3',
-  history: '#9C27B0'
-};
-
-const categoryIcons = {
-  science: '🔬',
-  jungle: '🐾',
-  math: '➗',
-  history: '🏛'
-};
+const defaultMap = scienceMap;
 
 export default function Playground() {
   const { category } = useParams();
   const navigate = useNavigate();
   const [selectedLevel, setSelectedLevel] = useState(null);
-  const { progress } = useUserProgress();
+  const { getCategoryProgress } = useUserProgress();
   const [data, setData] = useState({ levels: [] });
+  const [categoryData, setCategoryData] = useState(null);
+  const [isLoadingCategory, setIsLoadingCategory] = useState(true);
   const [showProgressOverview, setShowProgressOverview] = useState(false);
 
   useEffect(() => {
-    if (category === 'science') setData(dataScience);
-    else if (category === 'jungle') setData(dataJungle);
-    else if (category === 'math') setData(dataMath);
-    else if (category === 'history') setData(dataHistory);
-    setSelectedLevel(null);
+    async function loadCategory() {
+      setIsLoadingCategory(true);
+      setSelectedLevel(null);
+      try {
+        const response = await quizAPI.getCategory(category);
+        const nextCategory = response.data;
+        setCategoryData(nextCategory);
+        setData({ levels: nextCategory?.levels || [] });
+      } catch (error) {
+        setCategoryData(null);
+        setData({ levels: [] });
+      } finally {
+        setIsLoadingCategory(false);
+      }
+    }
+
+    loadCategory();
   }, [category]);
 
   function onLevelClick(level) {
     setSelectedLevel(level);
   }
 
-  const passed = new Set((progress[category] && progress[category].passed) || []);
-  const currentScore = Math.max(progress[category]?.score || 0, 0);
+  const categoryProgress = getCategoryProgress(category);
+  const passed = new Set(categoryProgress?.passed || []);
+  const currentScore = Math.max(categoryProgress?.score || 0, 0);
   const passedCount = passed.size;
   const totalLevels = data.levels.length;
   const progressPercentage = totalLevels > 0 ? (passedCount / totalLevels) * 100 : 0;
+  const categoryTitle = categoryData?.name || (category ? category.charAt(0).toUpperCase() + category.slice(1) : 'Quest');
+  const categoryColor = categoryData?.iconColor || '#2563eb';
+  const categoryLabel = categoryData?.label || 'QZ';
 
   const positions = [
     { left: '8%', top: '20%' },
@@ -75,98 +67,68 @@ export default function Playground() {
   ];
 
   return (
-    <div className="playground-container">
-      {/* Header Section */}
+    <div className="playground-container app-shell">
       <header className="playground-header">
         <div className="header-content">
-          <button 
-            onClick={() => navigate('/')}
-            className="back-button"
-          >
-            ← Back to Home
+          <button onClick={() => navigate('/')} className="back-button nav-button">
+            Back to Quests
           </button>
           <div className="category-title">
-            <span className="category-icon">{categoryIcons[category]}</span>
-            <h1>{category} Adventure</h1>
+            <span className="category-icon" style={{ backgroundColor: categoryColor }}>{categoryLabel}</span>
+            <h1>{categoryTitle} Quest</h1>
           </div>
-          
-          {/* Navbar with Leaderboard and Progress Overview */}
+
           <nav className="playground-nav">
-            <button 
-              onClick={() => navigate('/leaderboard')}
-              className="nav-button leaderboard-nav"
-              title="View Leaderboard"
-            >
-              <span className="nav-icon">🏆</span>
-              <span className="nav-text">Leaderboard</span>
+            <button onClick={() => navigate('/leaderboard')} className="nav-button" title="View Leaderboard">
+              Leaderboard
             </button>
-            
-            <button 
-              onClick={() => setShowProgressOverview(!showProgressOverview)}
-              className="nav-button progress-nav"
-              title="Progress Overview"
-            >
-              <span className="nav-icon">📊</span>
-              <span className="nav-text">Progress</span>
+            <button onClick={() => setShowProgressOverview(!showProgressOverview)} className="nav-button" title="Progress Overview">
+              Progress
             </button>
-            
-            <div className="header-progress">
-              <div className="score-badge">
-                🏅 {currentScore} Points
-              </div>
-            </div>
+            <div className="score-badge">{currentScore} Points</div>
           </nav>
         </div>
       </header>
 
-      {/* Progress Overview Modal */}
       {showProgressOverview && (
-        <div className="progress-overlay">
-          <div className="progress-modal">
+        <div className="instructions-overlay">
+          <div className="instructions-modal progress-modal">
             <div className="modal-header">
-              <h2>{category} Adventure Progress</h2>
-              <button 
-                onClick={() => setShowProgressOverview(false)}
-                className="close-button"
-              >
-                ✕
+              <h2>{categoryTitle} Progress</h2>
+              <button onClick={() => setShowProgressOverview(false)} className="close-button">
+                Close
               </button>
             </div>
-            
+
             <div className="progress-content">
-              {/* Progress Header */}
-              <div className="progress-header">
-                <div className="level-count">
-                  <span className="count">{passedCount}/{totalLevels}</span>
-                  <span className="label">Levels Completed</span>
-                </div>
+              <div className="progress-header-box">
+                <span className="count">{passedCount}/{totalLevels}</span>
+                <span className="label">Levels Completed</span>
               </div>
 
-              {/* Progress Details */}
               <div className="progress-details-modal">
                 <div className="progress-item-modal">
-                  <span className="progress-label">Levels Completed:</span>
+                  <span className="progress-label">Levels Completed</span>
                   <span className="progress-value">{passedCount}</span>
                 </div>
                 <div className="progress-item-modal">
-                  <span className="progress-label">Current Score:</span>
+                  <span className="progress-label">Current Score</span>
                   <span className="progress-value">{currentScore} pts</span>
                 </div>
                 <div className="progress-item-modal">
-                  <span className="progress-label">Levels Remaining:</span>
+                  <span className="progress-label">Levels Remaining</span>
                   <span className="progress-value">{totalLevels - passedCount}</span>
                 </div>
               </div>
 
-              {/* Category Progress */}
               <div className="category-progress-section">
                 <h3>Category Progress</h3>
                 <div className="progress-bar-large">
-                  <div 
+                  <div
                     className="progress-fill-large"
-                    style={{ 
+                    style={{
                       width: `${progressPercentage}%`,
-                      backgroundColor: categoryColors[category]
+                      backgroundColor: categoryColor
                     }}
                   ></div>
                 </div>
@@ -175,19 +137,18 @@ export default function Playground() {
                 </div>
               </div>
 
-              {/* Level Breakdown */}
               <div className="level-breakdown">
-                <h4>Level Progress (1-{totalLevels})</h4>
+                <h4>Level Progress</h4>
                 <div className="levels-grid">
                   {data.levels.map((_, index) => {
                     const levelNumber = index + 1;
-                    const isCompleted = passed.has(levelNumber);
+                    const isCompleted = passed.has(levelNumber - 1);
                     const isCurrent = !isCompleted && (index === 0 || passed.has(index));
-                    
+
                     return (
                       <div key={index} className="level-status">
                         <div className={`level-indicator ${isCompleted ? 'completed' : isCurrent ? 'current' : 'locked'}`}>
-                          {isCompleted ? '✓' : isCurrent ? '→' : levelNumber}
+                          {isCompleted ? 'OK' : isCurrent ? 'Now' : levelNumber}
                         </div>
                         <span className="level-text">Level {levelNumber}</span>
                         <span className="level-state">
@@ -199,56 +160,34 @@ export default function Playground() {
                 </div>
               </div>
 
-              <div className="modal-actions">
-                <button 
-                  onClick={() => setShowProgressOverview(false)}
-                  className="continue-button"
-                >
-                  Continue Playing
-                </button>
-              </div>
+              <button onClick={() => setShowProgressOverview(false)} className="start-button">
+                Continue Playing
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Main Content */}
       <main className="playground-main">
         <div className="layout-grid">
-          {/* Map Section */}
           <section className="map-section">
             <div className="map-container">
               <div className="map-header">
-                <h2>Explore the Map</h2>
-                <div className="map-instruction">
-                  <div className="progress-badge">
-                    {passedCount}/{totalLevels} Completed
-                  </div>
-                </div>
+                <h2>Quest Map</h2>
+                <div className="quest-badge">{passedCount}/{totalLevels} Completed</div>
               </div>
-              
+
               <div className="map-wrapper">
-                <img 
-                  className="map-image" 
-                  src={mapByCategory[category]} 
-                  alt={`${category} adventure map`} 
-                />
-                
-                {/* Level Markers - FIXED LOGIC */}
-                {data.levels.map((lvl, idx) => {
+                <img className="map-image" src={defaultMap} alt={`${categoryTitle} quest map`} />
+
+                {isLoadingCategory && <div className="map-loading">Loading quiz from MongoDB...</div>}
+                {!isLoadingCategory && data.levels.map((lvl, idx) => {
                   const pos = positions[idx] || { left: `${6 + idx * 8}%`, top: '40%' };
                   const levelNumber = idx + 1;
-
-                  // FIXED UNLOCKING LOGIC:
-                  // A level is locked only if:
-                  // 1. It's not level 1 AND
-                  // 2. Previous level is not completed AND
-                  // 3. This level itself is not completed
-                  const isCompleted = passed.has(levelNumber);
+                  const isCompleted = passed.has(levelNumber - 1);
                   const previousLevelCompleted = levelNumber === 1 || passed.has(levelNumber - 1);
                   const isLocked = !previousLevelCompleted && !isCompleted;
-                  
-                  // Current level is the first incomplete level
+
                   let currentLevelIndex = -1;
                   for (let i = 0; i < totalLevels; i++) {
                     if (!passed.has(i + 1)) {
@@ -256,11 +195,10 @@ export default function Playground() {
                       break;
                     }
                   }
-                  
-                  // If all levels completed, consider the last level as current
-                  const isCurrent = currentLevelIndex === -1 ? 
-                    levelNumber === totalLevels : 
-                    levelNumber === currentLevelIndex + 1;
+
+                  const isCurrent = currentLevelIndex === -1
+                    ? levelNumber === totalLevels
+                    : levelNumber === currentLevelIndex + 1;
 
                   return (
                     <LevelMarker
@@ -277,37 +215,21 @@ export default function Playground() {
                 })}
               </div>
 
-              {/* Map Legend */}
               <div className="map-legend">
-                <div className="legend-item">
-                  <div className="legend-color current"></div>
-                  <span>Current Level</span>
-                </div>
-                <div className="legend-item">
-                  <div className="legend-color completed"></div>
-                  <span>Completed</span>
-                </div>
-                <div className="legend-item">
-                  <div className="legend-color locked"></div>
-                  <span>Locked</span>
-                </div>
+                <div className="legend-item"><div className="legend-color current"></div><span>Current</span></div>
+                <div className="legend-item"><div className="legend-color completed"></div><span>Completed</span></div>
+                <div className="legend-item"><div className="legend-color locked"></div><span>Locked</span></div>
               </div>
             </div>
           </section>
 
-          {/* Sidebar Section */}
           <aside className="sidebar">
             <div className="question-section">
               {selectedLevel ? (
                 <div className="mcq-container">
                   <div className="mcq-header">
-                    <h3>Level {selectedLevel.level}</h3>
-                    <button
-                      onClick={() => setSelectedLevel(null)}
-                      className="stop-mcq-button"
-                      title="Stop Current Level"
-                    >
-                      <span className="stop-icon">⛔</span>
+                    <h3>Level {selectedLevel.level} Challenge</h3>
+                    <button onClick={() => setSelectedLevel(null)} className="stop-mcq-button" title="Stop Current Level">
                       Stop
                     </button>
                   </div>
@@ -324,23 +246,14 @@ export default function Playground() {
                 </div>
               ) : (
                 <div className="welcome-card">
-                  <div className="welcome-icon">🎯</div>
-                  <h3>Ready to Start?</h3>
-                  <p>Select a level on the map to begin your {category} adventure!</p>
-                  
+                  <div className="welcome-icon">Start</div>
+                  <h3>Ready to Begin?</h3>
+                  <p>Select an unlocked level on the map to start your {category} challenge.</p>
+
                   <div className="tips">
-                    <div className="tip">
-                      <span className="tip-icon">💡</span>
-                      Complete levels in order to unlock new challenges
-                    </div>
-                    <div className="tip">
-                      <span className="tip-icon">⭐</span>
-                      Earn points for correct answers (first time only)
-                    </div>
-                    <div className="tip">
-                      <span className="tip-icon">🔄</span>
-                      Replay completed levels anytime - progress is saved
-                    </div>
+                    <div className="tip">Complete levels in order to unlock new challenges.</div>
+                    <div className="tip">Earn points for correct answers the first time.</div>
+                    <div className="tip">Replay completed levels anytime.</div>
                   </div>
                 </div>
               )}
@@ -348,540 +261,323 @@ export default function Playground() {
           </aside>
         </div>
       </main>
-
-      <style jsx>{`
-        .playground-container {
-          min-height: 100vh;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          font-family: 'Poppins', sans-serif;
-        }
-
-        .playground-header {
-          background: rgba(255, 255, 255, 0.95);
-          backdrop-filter: blur(10px);
-          padding: 20px 0;
-          box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
-        }
-
-        .header-content {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 0 20px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 20px;
-        }
-
-        .back-button {
-          background: #f8f9fa;
-          border: 2px solid #e9ecef;
-          padding: 10px 20px;
-          border-radius: 25px;
-          cursor: pointer;
-          font-weight: 500;
-          transition: all 0.3s ease;
-          color: #495057;
-        }
-
-        .back-button:hover {
-          background: #e9ecef;
-          transform: translateX(-5px);
-        }
-
-        .category-title {
-          display: flex;
-          align-items: center;
-          gap: 15px;
-          flex: 1;
-          justify-content: center;
-        }
-
-        .category-title h1 {
-          margin: 0;
-          font-size: 2.2rem;
-          font-weight: 700;
-          background: linear-gradient(135deg, #667eea, #764ba2);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          text-transform: capitalize;
-        }
-
-        .category-icon {
-          font-size: 2.5rem;
-        }
-
-        .playground-nav {
-          display: flex;
-          align-items: center;
-          gap: 15px;
-        }
-
-        .nav-button {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 16px;
-          border: 2px solid #e9ecef;
-          border-radius: 25px;
-          cursor: pointer;
-          font-weight: 500;
-          transition: all 0.3s ease;
-          background: white;
-          color: #495057;
-        }
-
-        .nav-button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        .score-badge {
-          background: linear-gradient(45deg, #FFD700, #FFA000);
-          color: #333;
-          padding: 8px 16px;
-          border-radius: 20px;
-          font-weight: 600;
-          box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
-        }
-
-        .playground-main {
-          padding: 30px 20px;
-          max-width: 1400px;
-          margin: 0 auto;
-        }
-
-        .layout-grid {
-          display: grid;
-          grid-template-columns: 1fr 360px;
-          gap: 30px;
-          align-items: start;
-        }
-
-        .map-section {
-          background: white;
-          border-radius: 20px;
-          padding: 25px;
-          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-          min-height: 600px;
-        }
-
-        .map-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-        }
-
-        .map-wrapper {
-          position: relative;
-          border-radius: 15px;
-          overflow: hidden;
-          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-          background: #f8f9fa;
-          min-height: 500px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .map-image {
-          width: 100%;
-          height: auto;
-          border-radius: 15px;
-        }
-
-        .map-legend {
-          display: flex;
-          justify-content: center;
-          gap: 20px;
-          margin-top: 20px;
-          padding: 15px;
-          background: #f8f9fa;
-          border-radius: 10px;
-        }
-
-        .legend-item {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .legend-color {
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          border: 2px solid white;
-        }
-
-        .legend-color.current { background: #4CAF50; }
-        .legend-color.completed { background: #2196F3; }
-        .legend-color.locked { background: #9e9e9e; }
-
-        .sidebar {
-          width: 360px;
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-          position: sticky;
-          top: 20px;
-        }
-
-        .mcq-container {
-          background: white;
-          border-radius: 15px;
-          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-          overflow: hidden;
-        }
-
-        .mcq-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 20px;
-          background: linear-gradient(135deg, #667eea, #764ba2);
-          color: white;
-        }
-
-        .stop-mcq-button {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 8px 16px;
-          background: rgba(255, 255, 255, 0.2);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          border-radius: 20px;
-          color: white;
-          cursor: pointer;
-        }
-
-        .welcome-card {
-          background: white;
-          border-radius: 15px;
-          padding: 25px;
-          text-align: center;
-          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-        }
-
-        .welcome-icon {
-          font-size: 3.5rem;
-          margin-bottom: 15px;
-        }
-
-        .tips {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          margin-top: 20px;
-        }
-
-        .tip {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 10px;
-          background: #f8f9fa;
-          border-radius: 8px;
-          text-align: left;
-        }
-
-        @media (max-width: 1024px) {
-          .layout-grid {
-            grid-template-columns: 1fr;
-            gap: 20px;
-          }
-          
-          .sidebar {
-            width: 100%;
-            max-width: 400px;
-            margin: 0 auto;
-          }
-        }
-
-        @media (max-width: 768px) {
-          .header-content {
-            flex-direction: column;
-            text-align: center;
-            gap: 15px;
-          }
-          
-          .category-title {
-            justify-content: center;
-          }
-          
-          .playground-nav {
-            justify-content: center;
-            flex-wrap: wrap;
-          }
-          
-          .map-header {
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-          }
-          
-          .map-legend {
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-          }
-        }
-      `}</style>
     </div>
   );
 }
 
-// CSS Styles
 const styles = `
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 .playground-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #0f172a;
+  background:
+    radial-gradient(circle at top right, rgba(124, 58, 237, 0.12), transparent 32rem),
+    linear-gradient(135deg, #f8fbff 0%, #eef6ff 48%, #f7f4ff 100%);
 }
 
 .playground-header {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  padding: 20px 0;
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #e2e8f0;
+  margin: 18px auto 0;
+  max-width: 1400px;
+  width: calc(100% - 32px);
+  border-radius: 8px;
+  padding: 14px 18px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
 .header-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 20px;
-}
-
-.back-button {
-  background: #f8f9fa;
-  border: 2px solid #e9ecef;
-  padding: 10px 20px;
-  border-radius: 25px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  color: #495057;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.back-button:hover {
-  background: #e9ecef;
-  transform: translateX(-5px);
+  gap: 14px;
 }
 
 .category-title {
   display: flex;
   align-items: center;
-  gap: 15px;
-  flex: 1;
-  justify-content: center;
+  gap: 12px;
 }
 
 .category-title h1 {
   margin: 0;
-  font-size: 2.2rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  font-size: 1.35rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #1d4ed8, #7c3aed);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-transform: capitalize;
 }
 
 .category-icon {
-  font-size: 2.5rem;
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
-}
-
-/* Header Progress Display */
-.header-progress {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
-  gap: 15px;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.86rem;
 }
 
-.progress-badge {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-weight: 600;
-  font-size: 0.9rem;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+.playground-nav {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.nav-button,
+.stop-mcq-button {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 9px 13px;
+  font-weight: 800;
+  font-size: 0.88rem;
+  color: #334155;
+  cursor: pointer;
+}
+
+.nav-button:hover,
+.stop-mcq-button:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
 }
 
 .score-badge {
-  background: linear-gradient(45deg, #FFD700, #FFA000);
-  color: #333;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-weight: 600;
-  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
-}
-
-/* Navbar Styles */
-.playground-nav {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.nav-button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border: 2px solid #e9ecef;
-  border-radius: 25px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  background: white;
-  color: #495057;
-  text-decoration: none;
-}
-
-.nav-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.leaderboard-nav:hover {
-  border-color: #FFD700;
-  background: #FFF9C4;
-}
-
-.progress-nav:hover {
-  border-color: #4CAF50;
-  background: #E8F5E8;
-}
-
-.nav-icon {
-  font-size: 1.2rem;
-}
-
-.nav-text {
+  background: linear-gradient(135deg, #dbeafe, #ede9fe);
+  color: #1e40af;
+  padding: 9px 13px;
+  border-radius: 8px;
+  font-weight: 800;
   font-size: 0.9rem;
-  font-weight: 600;
 }
 
-/* Progress Overview Modal */
-.progress-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(5px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
+.playground-main {
+  padding: 28px 16px 40px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.progress-modal {
-  background: white;
-  border-radius: 20px;
-  padding: 30px;
-  max-width: 500px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: modalSlideIn 0.3s ease;
+.layout-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 24px;
+  align-items: start;
 }
 
-@keyframes modalSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.map-section,
+.mcq-container,
+.welcome-card {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
-.modal-header {
+.map-section {
+  padding: 22px;
+  min-height: 600px;
+  border-top: 5px solid #2563eb;
+}
+
+.map-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 25px;
-  padding-bottom: 15px;
-  border-bottom: 2px solid #f0f0f0;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
-.modal-header h2 {
+.map-header h2 {
   margin: 0;
-  color: #333;
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 800;
 }
 
-.close-button {
-  background: #f8f9fa;
-  border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
+.map-wrapper {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 500px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  font-size: 1.2rem;
-  color: #666;
-  transition: all 0.3s ease;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
 }
 
-.close-button:hover {
-  background: #e9ecef;
-  color: #333;
+.map-image {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
-.progress-header {
-  text-align: center;
-  margin-bottom: 30px;
-  padding: 20px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border-radius: 15px;
+.map-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248, 250, 252, 0.86);
+  color: #1d4ed8;
+  font-weight: 800;
+}
+
+.map-legend {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 16px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: #475569;
+}
+
+.legend-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+.legend-color.current { background: #0f172a; }
+.legend-color.completed { background: #16a34a; }
+.legend-color.locked { background: #94a3b8; }
+
+.sidebar {
+  width: 100%;
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+.mcq-container {
+  overflow: hidden;
+}
+
+.mcq-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px;
+  background: linear-gradient(135deg, #0f172a, #1e3a8a);
   color: white;
 }
 
-.level-count .count {
-  display: block;
-  font-size: 3rem;
-  font-weight: 700;
-  margin-bottom: 5px;
+.mcq-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
 }
 
-.level-count .label {
-  font-size: 1.1rem;
-  opacity: 0.9;
+.stop-mcq-button {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.25);
+  color: white;
+}
+
+.welcome-card {
+  padding: 30px 24px;
+  text-align: left;
+}
+
+.welcome-icon {
+  display: inline-flex;
+  background: linear-gradient(135deg, #dbeafe, #ede9fe);
+  color: #1d4ed8;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-weight: 800;
+  margin-bottom: 18px;
+}
+
+.welcome-card h3 {
+  font-size: 1.45rem;
+  font-weight: 800;
+  margin: 0 0 10px;
+}
+
+.welcome-card p {
+  color: #64748b;
+  font-size: 0.94rem;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.tips {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tip {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.progress-modal {
+  max-width: 640px;
+}
+
+.progress-header-box {
+  text-align: center;
+  margin-bottom: 18px;
+  padding: 18px;
+  background: linear-gradient(135deg, #eff6ff, #f5f3ff);
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.progress-header-box .count {
+  display: block;
+  font-size: 2.4rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+  color: #0f172a;
+}
+
+.progress-header-box .label {
+  font-size: 0.95rem;
+  color: #64748b;
+  font-weight: 700;
 }
 
 .progress-details-modal {
-  background: #f8f9fa;
-  border-radius: 15px;
-  padding: 20px;
-  margin-bottom: 25px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 18px;
+  margin-bottom: 18px;
 }
 
 .progress-item-modal {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 11px 0;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .progress-item-modal:last-child {
@@ -889,59 +585,49 @@ const styles = `
 }
 
 .progress-label {
-  color: #666;
-  font-size: 1rem;
-  font-weight: 500;
+  color: #64748b;
+  font-weight: 700;
 }
 
 .progress-value {
-  color: #333;
-  font-weight: 600;
-  font-size: 1.1rem;
+  color: #0f172a;
+  font-weight: 800;
 }
 
 .category-progress-section {
-  margin-bottom: 25px;
+  margin-bottom: 20px;
 }
 
-.category-progress-section h3 {
-  margin: 0 0 15px 0;
-  color: #333;
-  font-size: 1.2rem;
-  font-weight: 600;
+.category-progress-section h3,
+.level-breakdown h4 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 800;
 }
 
 .progress-bar-large {
   width: 100%;
   height: 12px;
-  background: #f0f0f0;
-  border-radius: 10px;
+  background: #e2e8f0;
+  border-radius: 999px;
   overflow: hidden;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .progress-fill-large {
   height: 100%;
-  border-radius: 10px;
-  transition: width 0.5s ease;
+  border-radius: 999px;
 }
 
 .progress-percentage {
   text-align: center;
-  font-weight: 600;
-  color: #666;
-  font-size: 1rem;
+  font-weight: 700;
+  color: #64748b;
+  font-size: 0.9rem;
 }
 
 .level-breakdown {
-  margin-bottom: 25px;
-}
-
-.level-breakdown h4 {
-  margin: 0 0 15px 0;
-  color: #333;
-  font-size: 1.1rem;
-  font-weight: 600;
+  margin-bottom: 20px;
 }
 
 .levels-grid {
@@ -954,401 +640,206 @@ const styles = `
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px;
-  background: #f8f9fa;
+  padding: 11px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
 }
 
 .level-indicator {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
+  width: 34px;
+  height: 28px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 800;
   color: white;
 }
 
-.level-indicator.completed {
-  background: #4CAF50;
-}
-
-.level-indicator.current {
-  background: #2196F3;
-}
-
-.level-indicator.locked {
-  background: #9e9e9e;
-  color: white;
-}
+.level-indicator.completed { background: #16a34a; }
+.level-indicator.current { background: #0f172a; }
+.level-indicator.locked { background: #94a3b8; }
 
 .level-text {
   font-size: 0.9rem;
-  font-weight: 500;
-  color: #333;
+  font-weight: 700;
+  color: #0f172a;
   flex: 1;
 }
 
 .level-state {
-  font-size: 0.8rem;
-  color: #666;
-  font-weight: 500;
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
-.modal-actions {
-  display: flex;
-  justify-content: center;
+.mcq-card-inner {
+  padding: 22px;
+  color: #0f172a;
 }
 
-.continue-button {
-  padding: 12px 30px;
-  background: linear-gradient(135deg, #4CAF50, #45a049);
-  color: white;
-  border: none;
-  border-radius: 25px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 1rem;
-}
-
-.continue-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(76, 175, 80, 0.3);
-}
-
-.playground-main {
-  padding: 30px 20px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.layout-grid {
-  display: grid;
-  grid-template-columns: 1fr 360px;
-  gap: 30px;
-  align-items: start;
-}
-
-/* Map Section */
-.map-section {
-  background: white;
-  border-radius: 20px;
-  padding: 25px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-  min-height: 600px;
-}
-
-.map-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-  gap: 15px;
-}
-
-.map-header h2 {
-  margin: 0;
-  color: #333;
-  font-size: 1.5rem;
-}
-
-.map-instruction {
-  color: #666;
-  font-size: 1rem;
-  font-weight: 500;
-}
-
-.map-wrapper {
-  position: relative;
-  border-radius: 15px;
-  overflow: hidden;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-  background: #f8f9fa;
-  min-height: 500px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.map-image {
-  width: 100%;
-  height: auto;
-  display: block;
-  border-radius: 15px;
-}
-
-.map-legend {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  margin-top: 20px;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 10px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.legend-color {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid white;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-.legend-color.current {
-  background: #4CAF50;
-}
-
-.legend-color.completed {
-  background: #2196F3;
-}
-
-.legend-color.locked {
-  background: #9e9e9e;
-}
-
-/* Sidebar - Clean without progress info */
-.sidebar {
-  width: 360px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  position: sticky;
-  top: 20px;
-  max-height: calc(100vh - 100px);
-  overflow-y: auto;
-}
-
-/* Question Section */
-.question-section {
-  flex: 1;
-}
-
-/* MCQ Container with Stop Button */
-.mcq-container {
-  background: white;
-  border-radius: 15px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-}
-
-.mcq-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-}
-
-.mcq-header h3 {
-  margin: 0;
-  font-size: 1.3rem;
-  font-weight: 600;
-}
-
-.stop-mcq-button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 20px;
-  color: white;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
-}
-
-.stop-mcq-button:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateY(-2px);
-}
-
-.stop-icon {
-  font-size: 1rem;
-}
-
-.welcome-card {
-  background: white;
-  border-radius: 15px;
-  padding: 25px;
+.mcq-empty {
+  padding: 36px;
   text-align: center;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-  min-height: 300px;
+  color: #475569;
+}
+
+.mcq-timer {
+  margin-bottom: 18px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.time-safe { color: #1d4ed8; }
+.time-danger { color: #dc2626; }
+
+.mcq-image {
+  width: 100%;
+  max-height: 250px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 18px;
+  border: 1px solid #e2e8f0;
+}
+
+.mcq-question {
+  margin-bottom: 18px;
+  color: #0f172a;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.mcq-options {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 10px;
+  margin-bottom: 22px;
 }
 
-.welcome-icon {
-  font-size: 3.5rem;
-  margin-bottom: 15px;
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
+.mcq-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.98rem;
 }
 
-.welcome-card h3 {
-  margin: 0 0 12px 0;
-  color: #333;
-  font-size: 1.3rem;
+.mcq-option:hover:not(.disabled) {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.mcq-option.selected {
+  border-color: #2563eb;
+  background: #dbeafe;
+}
+
+.mcq-option.disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.mcq-radio {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+}
+
+.mcq-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mcq-btn {
+  padding: 13px 18px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 800;
+  font-size: 0.96rem;
+  cursor: pointer;
+  flex: 1;
+  min-width: 120px;
+  text-align: center;
+}
+
+.mcq-submit {
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: white;
+}
+
+.mcq-submit:hover {
+  background: linear-gradient(135deg, #1d4ed8, #4338ca);
+}
+
+.mcq-hint-toggle {
+  background: #f59e0b;
+  color: #111827;
+}
+
+.mcq-hint-toggle:hover {
+  background: #d97706;
+  color: white;
+}
+
+.mcq-hint-box {
+  margin-top: 18px;
+  padding: 14px;
+  background: #fffbeb;
+  border: 1px solid #facc15;
+  border-radius: 8px;
+  color: #92400e;
   font-weight: 600;
 }
 
-.welcome-card p {
-  color: #666;
-  margin-bottom: 20px;
-  line-height: 1.5;
-  font-size: 0.95rem;
-}
-
-.tips {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.tip {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  background: #f8f9fa;
+.mcq-result {
+  margin-top: 18px;
+  padding: 16px;
   border-radius: 8px;
-  font-size: 0.85rem;
-  color: #555;
-  text-align: left;
-}
-
-.tip-icon {
+  text-align: center;
+  font-weight: 800;
   font-size: 1rem;
-  flex-shrink: 0;
 }
 
-/* Responsive Design */
+.mcq-result.success { background: #dcfce7; border: 1px solid #86efac; color: #166534; }
+.mcq-result.neutral { background: #f8fafc; border: 1px solid #cbd5e1; color: #334155; }
+.mcq-result.grand-success { background: #dbeafe; border: 1px solid #93c5fd; color: #1e40af; padding: 24px; }
+.mcq-result.error { background: #fee2e2; border: 1px solid #fecaca; color: #991b1b; }
+.mcq-result.warning { background: #ffedd5; border: 1px solid #fed7aa; color: #9a3412; }
+.grand-icon { display: none; }
+
 @media (max-width: 1024px) {
-  .layout-grid {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-  
-  .sidebar {
-    width: 100%;
-    max-width: 400px;
-    margin: 0 auto;
-    position: static;
-    max-height: none;
-  }
+  .layout-grid { grid-template-columns: 1fr; }
+  .sidebar { max-width: 640px; margin: 0 auto; position: static; max-height: none; }
 }
 
 @media (max-width: 768px) {
-  .header-content {
-    flex-direction: column;
-    text-align: center;
-    gap: 15px;
-  }
-  
-  .category-title {
-    justify-content: center;
-  }
-  
-  .header-progress {
-    justify-content: center;
-  }
-  
-  .playground-nav {
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-  
-  .map-header {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-  
-  .map-legend {
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-  }
-  
-  .sidebar {
-    max-width: 100%;
-  }
-  
-  .nav-text {
-    display: none;
-  }
-  
-  .nav-button {
-    padding: 10px;
-  }
-  
-  .progress-modal {
-    padding: 20px;
-    margin: 10px;
-  }
-  
-  .levels-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 480px) {
-  .playground-main {
-    padding: 20px 15px;
-  }
-  
-  .map-section, .welcome-card {
-    padding: 20px;
-  }
-  
-  .category-title h1 {
-    font-size: 1.8rem;
-  }
-  
-  .header-progress {
-    flex-direction: column;
-    gap: 10px;
-  }
-  
-  .map-wrapper {
-    min-height: 400px;
-  }
-  
-  .mcq-header {
-    padding: 15px;
-  }
-  
-  .mcq-header h3 {
-    font-size: 1.1rem;
-  }
-  
-  .stop-mcq-button {
-    padding: 6px 12px;
-    font-size: 0.8rem;
-  }
+  .header-content { justify-content: center; text-align: center; }
+  .playground-nav { width: 100%; justify-content: center; }
+  .levels-grid { grid-template-columns: 1fr; }
+  .mcq-actions { flex-direction: column; }
 }
 `;
 
-// Add styles to document
 if (typeof document !== 'undefined') {
+  const existing = document.getElementById("eduquest-playground-styles");
+  if (existing) existing.remove();
   const styleSheet = document.createElement("style");
+  styleSheet.id = "eduquest-playground-styles";
   styleSheet.innerText = styles;
   document.head.appendChild(styleSheet);
 }

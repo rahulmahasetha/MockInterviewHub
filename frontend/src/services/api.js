@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:3001';
+const API_BASE = 'http://127.0.0.1:3001';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -8,6 +8,12 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Authentication Operations
+export const authAPI = {
+  login: (data) => api.post('/auth/login', data),
+  signup: (data) => api.post('/auth/signup', data),
+};
 
 // User Progress CRUD Operations
 export const userProgressAPI = {
@@ -22,6 +28,12 @@ export const leaderboardAPI = {
   getLeaderboard: () => api.get('/leaderboard?_sort=score&_order=desc'),
   addToLeaderboard: (data) => api.post('/leaderboard', data),
   updateLeaderboard: (id, data) => api.put(`/leaderboard/${id}`, data),
+};
+
+// Quiz Category Operations
+export const quizAPI = {
+  getCategories: () => api.get('/quiz-categories'),
+  getCategory: (slug) => api.get(`/quiz-categories/${slug}`),
 };
 
 // User Management CRUD Operations
