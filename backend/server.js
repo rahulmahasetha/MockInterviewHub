@@ -284,6 +284,7 @@ mongoose.connect(MONGODB_URI, {
 // --- MongoDB / Mongoose Schemas ---
 const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
+  email: { type: String, required: true },
   password: { type: String, required: true },
   createdAt: { type: Date, default: Date.now }
 });
@@ -408,9 +409,9 @@ async function cleanupDuplicateLeaderboardEntries() {
 // --- SECURE AUTHENTICATION ENDPOINTS ---
 
 app.post('/auth/signup', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
+  const { username, email, password } = req.body;
+  if (!username || !email || !password) {
+    return res.status(400).json({ error: 'Username, email and password are required' });
   }
 
   if (isMongoDBConnected) {
@@ -422,7 +423,7 @@ app.post('/auth/signup', async (req, res) => {
 
       // Hash password securely
       const hashedPassword = await bcrypt.hash(password, 10);
-      const newUser = new User({ username, password: hashedPassword });
+      const newUser = new User({ username, email, password: hashedPassword });
       await newUser.save();
 
       // Create new blank progress for user
@@ -454,7 +455,7 @@ app.post('/auth/signup', async (req, res) => {
     }
 
     const userId = 'offline_' + Date.now();
-    const newUser = { id: userId, username, password }; // plain-text or simplified storage for offline testing
+    const newUser = { id: userId, username, email, password }; // plain-text or simplified storage for offline testing
     data.users.push(newUser);
 
     const newProgress = {
@@ -517,6 +518,42 @@ app.post('/auth/login', async (req, res) => {
       userId: user.id,
       username: user.username
     });
+  }
+});
+
+app.post('/auth/forgot-password', async (req, res) => {
+  const { username, email, newPassword } = req.body;
+  if (!username || !email || !newPassword) {
+    return res.status(400).json({ error: 'Username, email and new password are required' });
+  }
+
+  if (isMongoDBConnected) {
+    try {
+      const user = await User.findOne({ username, email });
+      if (!user) {
+        return res.status(400).json({ error: 'Invalid username or email' });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      user.password = hashedPassword;
+      await user.save();
+
+      res.json({ success: true, message: 'Password updated successfully' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    // Resilient Fallback Database Mode
+    const data = readFallbackData();
+    const user = data.users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.email === email);
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid username or email' });
+    }
+
+    user.password = newPassword;
+    writeFallbackData(data);
+
+    res.json({ success: true, message: 'Password updated successfully' });
   }
 });
 

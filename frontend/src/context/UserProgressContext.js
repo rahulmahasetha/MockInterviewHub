@@ -83,9 +83,9 @@ export function UserProgressProvider({ children }) {
   }, []);
 
   // Register a new user (Sign Up)
-  const signUpUser = async (username, password) => {
+  const signUpUser = async (username, email, password) => {
     try {
-      const response = await authAPI.signup({ username, password });
+      const response = await authAPI.signup({ username, email, password });
       const user = response.data;
       const userId = user.userId;
 
@@ -108,6 +108,24 @@ export function UserProgressProvider({ children }) {
       }
 
       const errMsg = error.response?.data?.error || 'Registration failed. Try again.';
+      toast.error(errMsg);
+      return { success: false, error: errMsg };
+    }
+  };
+
+  // Forgot Password
+  const forgotPasswordUser = async (username, email, newPassword) => {
+    try {
+      const response = await authAPI.forgotPassword({ username, email, newPassword });
+      toast.success(response.data.message || 'Password updated successfully!');
+      return { success: true };
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      if (!error.response || error.code === 'ERR_NETWORK') {
+        toast.error('Cannot reach the server.');
+        return { success: false, error: 'Server unreachable' };
+      }
+      const errMsg = error.response?.data?.error || 'Failed to update password.';
       toast.error(errMsg);
       return { success: false, error: errMsg };
     }
@@ -367,6 +385,7 @@ export function UserProgressProvider({ children }) {
         signInUser,
         signUpUser,
         logoutUser,
+        forgotPasswordUser,
         fetchGlobalLeaderboard
       }}
     >

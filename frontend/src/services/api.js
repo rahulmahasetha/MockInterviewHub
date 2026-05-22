@@ -13,6 +13,7 @@ const api = axios.create({
 export const authAPI = {
   login: (data) => api.post('/auth/login', data),
   signup: (data) => api.post('/auth/signup', data),
+  forgotPassword: (data) => api.post('/auth/forgot-password', data),
 };
 
 // User Progress CRUD Operations

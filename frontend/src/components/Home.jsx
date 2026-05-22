@@ -5,11 +5,12 @@ import { useUserProgress } from "../context/UserProgressContext";
 import { quizAPI } from "../services/api";
 
 export default function Home() {
-  const { progress, resetProgress, signInUser, signUpUser, logoutUser, getTotalScore, getCategoryProgress } = useUserProgress();
+  const { progress, resetProgress, signInUser, signUpUser, logoutUser, getTotalScore, getCategoryProgress, forgotPasswordUser } = useUserProgress();
   const [showInstructions, setShowInstructions] = useState(false);
   const [categories, setCategories] = useState([]);
   const [activeTab, setActiveTab] = useState("signin");
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,15 +44,28 @@ export default function Home() {
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     const trimmedUser = username.trim();
+    const trimmedEmail = email.trim();
     const trimmedPass = password.trim();
-    if (!trimmedUser || !trimmedPass) {
-      return alert("Please fill in all fields.");
-    }
+    
     setIsSubmitting(true);
     if (activeTab === "signin") {
+      if (!trimmedUser || !trimmedPass) {
+        setIsSubmitting(false);
+        return alert("Please fill in all fields.");
+      }
       await signInUser(trimmedUser, trimmedPass);
-    } else {
-      await signUpUser(trimmedUser, trimmedPass);
+    } else if (activeTab === "signup") {
+      if (!trimmedUser || !trimmedEmail || !trimmedPass) {
+        setIsSubmitting(false);
+        return alert("Please fill in all fields.");
+      }
+      await signUpUser(trimmedUser, trimmedEmail, trimmedPass);
+    } else if (activeTab === "forgot") {
+      if (!trimmedUser || !trimmedEmail || !trimmedPass) {
+        setIsSubmitting(false);
+        return alert("Please fill in all fields.");
+      }
+      await forgotPasswordUser(trimmedUser, trimmedEmail, trimmedPass);
     }
     setIsSubmitting(false);
   };
@@ -65,22 +79,34 @@ export default function Home() {
             <p className="logo-tagline">Professional MCQ practice for focused learning</p>
           </div>
 
-          <div className="auth-tabs">
-            <button
-              type="button"
-              className={`auth-tab ${activeTab === 'signin' ? 'active' : ''}`}
-              onClick={() => { setActiveTab('signin'); setUsername(''); setPassword(''); }}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              className={`auth-tab ${activeTab === 'signup' ? 'active' : ''}`}
-              onClick={() => { setActiveTab('signup'); setUsername(''); setPassword(''); }}
-            >
-              Create Account
-            </button>
-          </div>
+          {activeTab !== 'forgot' ? (
+            <div className="auth-tabs">
+              <button
+                type="button"
+                className={`auth-tab ${activeTab === 'signin' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('signin'); setUsername(''); setEmail(''); setPassword(''); }}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                className={`auth-tab ${activeTab === 'signup' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('signup'); setUsername(''); setEmail(''); setPassword(''); }}
+              >
+                Create Account
+              </button>
+            </div>
+          ) : (
+            <div className="auth-tabs">
+              <button
+                type="button"
+                className="auth-tab active"
+                onClick={() => { setActiveTab('signin'); setUsername(''); setEmail(''); setPassword(''); }}
+              >
+                &larr; Back to Sign In
+              </button>
+            </div>
+          )}
 
           <form className="auth-form" onSubmit={handleAuthSubmit}>
             <div className="form-group">
@@ -96,8 +122,34 @@ export default function Home() {
               />
             </div>
 
+            {(activeTab === 'signup' || activeTab === 'forgot') && (
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input
+                  type="email"
+                  placeholder="Enter email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isSubmitting}
+                  className="auth-input"
+                  required
+                />
+              </div>
+            )}
+
             <div className="form-group">
-              <label className="form-label">Password</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="form-label">{activeTab === 'forgot' ? 'New Password' : 'Password'}</label>
+                {activeTab === 'signin' && (
+                  <button
+                    type="button"
+                    style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                    onClick={() => { setActiveTab('forgot'); setUsername(''); setEmail(''); setPassword(''); }}
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
               <div className="password-input-wrapper">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -119,7 +171,7 @@ export default function Home() {
             </div>
 
             <button type="submit" className="auth-submit-btn" disabled={isSubmitting}>
-              {isSubmitting ? "Please wait..." : activeTab === 'signin' ? "Sign In" : "Create Account"}
+              {isSubmitting ? "Please wait..." : activeTab === 'signin' ? "Sign In" : activeTab === 'signup' ? "Create Account" : "Update Password"}
             </button>
           </form>
           <div className="auth-footer-notice">
