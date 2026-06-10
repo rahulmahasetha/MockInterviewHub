@@ -27,6 +27,9 @@ export default function Leaderboard() {
   const totalSections = sections.length || 1;
   const completionPercentage = (completedSections / totalSections) * 100;
 
+  const quizLeaderboard = globalLeaderboard.filter(e => e.type !== 'interview');
+  const interviewLeaderboard = globalLeaderboard.filter(e => e.type === 'interview');
+
   return (
     <div className="lb-page">
       <header className="lb-header">
@@ -108,13 +111,13 @@ export default function Leaderboard() {
         </section>
 
         <section className="lb-hall">
-          <h2 className="lb-section-title">Global Hall of Fame</h2>
+          <h2 className="lb-section-title">Global Hall of Fame (Quests)</h2>
           <p className="lb-section-sub">Real-time ranks stored in MongoDB.</p>
 
-          <div className="lb-table-wrap">
+          <div className="lb-table-wrap" style={{ marginBottom: '40px' }}>
             {isLoading ? (
               <div className="lb-loading">Loading global scores...</div>
-            ) : globalLeaderboard.length === 0 ? (
+            ) : quizLeaderboard.length === 0 ? (
               <div className="lb-loading">No scores yet. Submit your first score.</div>
             ) : (
               <table className="lb-table">
@@ -127,7 +130,7 @@ export default function Leaderboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {globalLeaderboard.map((entry, index) => {
+                  {quizLeaderboard.map((entry, index) => {
                     const isMe = progress.username && entry.name.toLowerCase() === progress.username.toLowerCase();
                     const rank = index + 1;
                     return (
@@ -138,6 +141,51 @@ export default function Leaderboard() {
                           {isMe && <span className="lb-you-badge">YOU</span>}
                         </td>
                         <td className="lb-score-col">{entry.score} pts</td>
+                        <td className="lb-date-col">{entry.date}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <h2 className="lb-section-title">Interview Scoring</h2>
+          <p className="lb-section-sub">Obtained / Total points for each technical topic.</p>
+          
+          <div className="lb-table-wrap">
+            {isLoading ? (
+              <div className="lb-loading">Loading interview scores...</div>
+            ) : interviewLeaderboard.length === 0 ? (
+              <div className="lb-loading">No interviews taken yet. Try a Mock Interview!</div>
+            ) : (
+              <table className="lb-table">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Candidate</th>
+                    <th>Topic</th>
+                    <th style={{ textAlign: 'right' }}>Score (Obtained / Total)</th>
+                    <th style={{ textAlign: 'right' }}>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {interviewLeaderboard.map((entry, index) => {
+                    const isMe = progress.username && entry.name.toLowerCase() === progress.username.toLowerCase();
+                    const rank = index + 1;
+                    return (
+                      <tr key={entry.id || index} className={isMe ? 'lb-row-me' : ''}>
+                        <td className="lb-rank">{rank}</td>
+                        <td>
+                          {entry.name}
+                          {isMe && <span className="lb-you-badge">YOU</span>}
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '0.85rem', padding: '4px 10px', background: '#e0e7ff', color: '#4338ca', borderRadius: '6px', fontWeight: 700 }}>
+                            🎤 {entry.topic || "General"}
+                          </span>
+                        </td>
+                        <td className="lb-score-col">{entry.score} / {entry.maxScore || (entry.score > 0 ? entry.score : 50)}</td>
                         <td className="lb-date-col">{entry.date}</td>
                       </tr>
                     );

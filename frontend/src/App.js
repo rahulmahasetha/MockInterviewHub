@@ -6,6 +6,8 @@ import Home from './components/Home';
 import Playground from './components/Playground';
 import ScoreSummary from './components/ScoreSummary';
 import Leaderboard from './components/Leaderboard';
+import MockInterview from './components/MockInterview';
+import ResumeAI from './components/ResumeAI';
 import { UserProgressProvider } from './context/UserProgressContext';
 
 export default function App() {
@@ -27,6 +29,8 @@ export default function App() {
         <Route path="/playground/:category" element={<Playground />} />
         <Route path="/summary" element={<ScoreSummary />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
+        <Route path="/interview" element={<MockInterview />} />
+        <Route path="/resume-interview" element={<ResumeAI />} />
       </Routes>
     </UserProgressProvider>
   );

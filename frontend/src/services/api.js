@@ -14,6 +14,8 @@ export const authAPI = {
   login: (data) => api.post('/auth/login', data),
   signup: (data) => api.post('/auth/signup', data),
   forgotPassword: (data) => api.post('/auth/forgot-password', data),
+  updateProfile: (data) => api.put('/auth/update-profile', data),
+  getProfile: (userId) => api.get(`/auth/profile/${userId}`),
 };
 
 // User Progress CRUD Operations
@@ -37,12 +39,34 @@ export const quizAPI = {
   getCategory: (slug) => api.get(`/quiz-categories/${slug}`),
 };
 
+// Interview Operations
+export const interviewAPI = {
+  generateInterview: (data) => api.post('/api/interview/generate', data),
+  evaluateInterview: (data) => api.post('/api/interview/evaluate', data),
+  saveInterview: (data) => api.post('/api/interview/save', data),
+  getHistory: (userId) => api.get(`/api/interview/history/${userId}`),
+};
+
 // User Management CRUD Operations
 export const usersAPI = {
   getUsers: () => api.get('/users'),
   createUser: (data) => api.post('/users', data),
   updateUser: (id, data) => api.put(`/users/${id}`, data),
   deleteUser: (id) => api.delete(`/users/${id}`),
+};
+
+// AI Resume Interview Operations
+export const resumeAPI = {
+  uploadResume: (data) => api.post('/api/resume/upload', data),
+  getResumeData: (userId) => api.get(`/api/resume/${userId}`),
+  generateQuestions: (data) => api.post('/api/resume/generate-questions', data),
+  generateFollowUp: (data) => api.post('/api/resume/follow-up', data),
+  evaluateAnswer: (data) => api.post('/api/resume/evaluate-answer', data),
+  detectAI: (data) => api.post('/api/resume/detect-ai', data),
+  generateReport: (data) => api.post('/api/resume/final-report', data),
+  saveSession: (data) => api.post('/api/resume/save-session', data),
+  getHistory: (userId) => api.get(`/api/resume/history/${userId}`),
+  logViolation: (data) => api.post('/api/resume/proctor-violation', data),
 };
 
 export default api;

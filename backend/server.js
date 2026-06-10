@@ -4,7 +4,121 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require("groq-sdk");
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 require('dotenv').config();
+
+// --- Multer Setup for Resume Upload ---
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const safeName = path.basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, `resume_${Date.now()}_${safeName}`);
+  }
+});
+const allowedResumeExts = ['.pdf', '.docx'];
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedResumeExts.includes(ext)) cb(null, true);
+    else cb(new Error('Only PDF and DOCX files are allowed'));
+  }
+});
+
+const resumeUpload = upload.single('resume');
+
+const runResumeUpload = (req, res) => new Promise((resolve, reject) => {
+  resumeUpload(req, res, (err) => {
+    if (err) reject(err);
+    else resolve();
+  });
+});
+
+const createHttpError = (status, message) => {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+};
+
+const isPdfBuffer = (buffer) => {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 8) return false;
+  const header = buffer.subarray(0, 8).toString('latin1');
+  const tail = buffer.subarray(Math.max(0, buffer.length - 2048)).toString('latin1');
+  return header.startsWith('%PDF-') && tail.includes('%%EOF');
+};
+
+const isDocxBuffer = (buffer) => {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 4) return false;
+  return buffer[0] === 0x50 && buffer[1] === 0x4b;
+};
+
+const validateResumeFile = (file, buffer) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (!allowedResumeExts.includes(ext)) {
+    throw createHttpError(400, 'Only PDF and DOCX files are allowed.');
+  }
+  if (!buffer || buffer.length === 0) {
+    throw createHttpError(400, 'Uploaded resume file is empty.');
+  }
+  if (ext === '.pdf' && !isPdfBuffer(buffer)) {
+    throw createHttpError(400, 'Invalid or corrupted PDF file. Please upload a valid PDF resume.');
+  }
+  if (ext === '.docx' && !isDocxBuffer(buffer)) {
+    throw createHttpError(400, 'Invalid or corrupted DOCX file. Please upload a valid Word resume.');
+  }
+  return ext;
+};
+
+const normalizeResumeParseError = (err, ext) => {
+  const message = String(err?.message || '').toLowerCase();
+  if (
+    message.includes('invalid pdf') ||
+    message.includes('bad xref') ||
+    message.includes('xref') ||
+    message.includes('endobj') ||
+    message.includes('corrupt') ||
+    message.includes('encrypted')
+  ) {
+    return createHttpError(400, 'Could not read this PDF. It appears to be corrupted, encrypted, or not a valid PDF resume.');
+  }
+  if (ext === '.docx') {
+    return createHttpError(400, 'Could not read this DOCX file. It appears to be corrupted or not a valid Word resume.');
+  }
+  return createHttpError(400, 'Could not extract resume text from the uploaded file.');
+};
+
+const extractResumeText = async (filePath, file, buffer) => {
+  const ext = validateResumeFile(file, buffer);
+  try {
+    if (ext === '.pdf') {
+      const data = await pdfParse(buffer, {
+        max: 0,
+        version: 'v1.10.100'
+      });
+      return (data.text || '').trim();
+    }
+    const result = await mammoth.extractRawText({ buffer });
+    return (result.value || '').trim();
+  } catch (err) {
+    throw normalizeResumeParseError(err, ext);
+  }
+};
+
+const cleanupUploadedFile = (filePath) => {
+  if (!filePath) return;
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch (err) {
+    console.warn('Could not delete uploaded resume file:', err.message);
+  }
+};
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -19,24 +133,23 @@ const formatScoreTimestamp = () => new Date().toLocaleString(undefined, {
   second: '2-digit'
 });
 
-const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\$&');
 
 const dedupeLeaderboardRows = (rows) => {
-  const byName = new Map();
+  const byKey = new Map();
 
   for (const row of rows) {
-    const key = row.name?.toLowerCase();
-    if (!key) continue;
+    if (!row.name) continue;
+    const key = `${row.name.toLowerCase()}_${row.type || 'quiz'}_${row.topic || ''}`;
 
-    const existing = byName.get(key);
+    const existing = byKey.get(key);
     if (!existing || Number(row.score) > Number(existing.score)) {
-      byName.set(key, row);
+      byKey.set(key, row);
     }
   }
 
-  return [...byName.values()]
-    .sort((a, b) => Number(b.score) - Number(a.score))
-    .slice(0, 10);
+  return [...byKey.values()]
+    .sort((a, b) => Number(b.score) - Number(a.score));
 };
 
 const createInitialCategoryProgress = () => {
@@ -197,7 +310,7 @@ const QUIZ_CATEGORIES = [
 ];
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Path to fallback database file
 const FALLBACK_DB_PATH = path.join(__dirname, 'db_fallback.json');
@@ -246,46 +359,52 @@ mongoose.connect(MONGODB_URI, {
   useUnifiedTopology: true,
   serverSelectionTimeoutMS: 5000 // 5 seconds timeout
 })
-.then(async () => {
-  console.log('✅ Connected to MongoDB database successfully at ' + MONGODB_URI);
-  isMongoDBConnected = true;
+  .then(async () => {
+    console.log('✅ Connected to MongoDB database successfully at ' + MONGODB_URI);
+    isMongoDBConnected = true;
 
-  // Drop stale indexes that don't match current schema
-  try {
-    const usersCollection = mongoose.connection.collection('users');
-    const indexes = await usersCollection.indexes();
-    for (const idx of indexes) {
-      if (idx.key && idx.key.email !== undefined) {
-        console.log('🧹 Dropping stale email index from users collection...');
-        await usersCollection.dropIndex(idx.name);
-        console.log('✅ Stale email index removed successfully.');
+    // Drop stale indexes that don't match current schema
+    try {
+      const usersCollection = mongoose.connection.collection('users');
+      const indexes = await usersCollection.indexes();
+      for (const idx of indexes) {
+        if (idx.key && idx.key.email !== undefined) {
+          console.log('🧹 Dropping stale email index from users collection...');
+          await usersCollection.dropIndex(idx.name);
+          console.log('✅ Stale email index removed successfully.');
+        }
+      }
+    } catch (e) {
+      // Ignore if index doesn't exist
+      if (e.codeName !== 'IndexNotFound') {
+        console.log('Note: Could not clean stale indexes:', e.message);
       }
     }
-  } catch (e) {
-    // Ignore if index doesn't exist
-    if (e.codeName !== 'IndexNotFound') {
-      console.log('Note: Could not clean stale indexes:', e.message);
-    }
-  }
 
-  seedDefaultData();
-  seedQuizData();
-  cleanupDuplicateLeaderboardEntries();
-})
-.catch(err => {
-  console.log('\n⚠️  MongoDB Connection Failed!');
-  console.log(`Could not connect to database at ${MONGODB_URI}.`);
-  console.log('💡 INSTRUCTIONS: Please ensure MongoDB is installed and running on your system.');
-  console.log('💡 Alternatively, specify a custom connection string in the MONGODB_URI environment variable.');
-  console.log('🛡️  RESILIENT MODE: Falling back to local file-based database (db_fallback.json).\n');
-  isMongoDBConnected = false;
-});
+    seedDefaultData();
+    seedQuizData();
+    cleanupDuplicateLeaderboardEntries();
+  })
+  .catch(err => {
+    console.log('\n⚠️  MongoDB Connection Failed!');
+    console.log(`Could not connect to database at ${MONGODB_URI}.`);
+    console.log('💡 INSTRUCTIONS: Please ensure MongoDB is installed and running on your system.');
+    console.log('💡 Alternatively, specify a custom connection string in the MONGODB_URI environment variable.');
+    console.log('🛡️  RESILIENT MODE: Falling back to local file-based database (db_fallback.json).\n');
+    isMongoDBConnected = false;
+  });
 
 // --- MongoDB / Mongoose Schemas ---
 const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true },
   password: { type: String, required: true },
+  profilePhoto: { type: String, default: '' },
+  fullName: { type: String, default: '' },
+  collegeName: { type: String, default: '' },
+  branch: { type: String, default: '' },
+  year: { type: String, default: '' },
+  bio: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -322,7 +441,10 @@ const LeaderboardSchema = new mongoose.Schema({
   name: { type: String, required: true },
   score: { type: Number, required: true },
   date: { type: String, required: true },
-  id: { type: Number, unique: true, required: true }
+  id: { type: Number, unique: true, required: true },
+  type: { type: String, default: 'quiz' },
+  topic: { type: String, default: '' },
+  maxScore: { type: Number, default: 0 }
 });
 
 const QuizLevelSchema = new mongoose.Schema({
@@ -345,10 +467,65 @@ const QuizCategorySchema = new mongoose.Schema({
   levels: { type: [QuizLevelSchema], default: [] }
 });
 
+const InterviewResultSchema = new mongoose.Schema({
+  userId: { type: String, required: true, index: true },
+  date: { type: Date, default: Date.now },
+  topic: { type: String, default: '' },
+  overallScore: { type: Number, default: 0 },
+  communicationScore: { type: Number, default: 0 },
+  technicalScore: { type: Number, default: 0 },
+  confidenceScore: { type: Number, default: 0 },
+  feedbackSummary: { type: String, default: '' },
+  strengths: { type: [String], default: [] },
+  areasForImprovement: { type: [String], default: [] },
+  questionCount: { type: Number, default: 0 }
+});
+
 const User = mongoose.models.User || mongoose.model('User', UserSchema);
 const Progress = mongoose.models.Progress || mongoose.model('Progress', ProgressSchema);
 const Leaderboard = mongoose.models.Leaderboard || mongoose.model('Leaderboard', LeaderboardSchema);
 const QuizCategory = mongoose.models.QuizCategory || mongoose.model('QuizCategory', QuizCategorySchema);
+const InterviewResult = mongoose.models.InterviewResult || mongoose.model('InterviewResult', InterviewResultSchema);
+
+// --- Resume AI Schemas ---
+const ResumeDataSchema = new mongoose.Schema({
+  userId: { type: String, required: true },
+  personalDetails: { type: Object, default: {} },
+  education: { type: Array, default: [] },
+  skills: { type: Array, default: [] },
+  projects: { type: Array, default: [] },
+  experience: { type: Array, default: [] },
+  certifications: { type: Array, default: [] },
+  achievements: { type: Array, default: [] },
+  technologies: { type: Array, default: [] },
+  publications: { type: Array, default: [] },
+  rawText: { type: String, default: '' },
+  parsedAt: { type: Date, default: Date.now }
+});
+
+const ResumeInterviewSchema = new mongoose.Schema({
+  userId: { type: String, required: true },
+  date: { type: Date, default: Date.now },
+  category: { type: String, default: '' },
+  difficulty: { type: String, default: '' },
+  overallScore: { type: Number, default: 0 },
+  technicalScore: { type: Number, default: 0 },
+  communicationScore: { type: Number, default: 0 },
+  confidenceScore: { type: Number, default: 0 },
+  fluencyScore: { type: Number, default: 0 },
+  grammarScore: { type: Number, default: 0 },
+  originalityScore: { type: Number, default: 0 },
+  aiLikelihood: { type: Number, default: 0 },
+  strengths: { type: [String], default: [] },
+  weaknesses: { type: [String], default: [] },
+  sectionWisePerformance: { type: Object, default: {} },
+  proctoringViolations: { type: Array, default: [] },
+  hiringRecommendation: { type: String, default: '' },
+  qaList: { type: Array, default: [] }
+});
+
+const ResumeData = mongoose.models.ResumeData || mongoose.model('ResumeData', ResumeDataSchema);
+const ResumeInterview = mongoose.models.ResumeInterview || mongoose.model('ResumeInterview', ResumeInterviewSchema);
 
 // Seed default data to MongoDB if connected and empty
 async function seedDefaultData() {
@@ -677,7 +854,7 @@ app.delete('/users/:id', async (req, res) => {
 // 2. User Progress CRUD
 app.get('/progress', async (req, res) => {
   const { userId } = req.query;
-  
+
   if (isMongoDBConnected) {
     try {
       if (userId) {
@@ -732,7 +909,7 @@ app.post('/progress', async (req, res) => {
 
 app.put('/progress/:id', async (req, res) => {
   const { id } = req.params;
-  
+
   if (isMongoDBConnected) {
     try {
       // Allow updating by userId or mongoose _id
@@ -740,7 +917,7 @@ app.put('/progress/:id', async (req, res) => {
       if (mongoose.Types.ObjectId.isValid(id)) {
         updatedProgress = await Progress.findByIdAndUpdate(id, req.body, { new: true });
       }
-      
+
       if (!updatedProgress) {
         updatedProgress = await Progress.findOneAndUpdate({ userId: id }, req.body, { new: true });
       }
@@ -825,42 +1002,41 @@ app.post('/leaderboard', async (req, res) => {
     return res.status(400).json({ error: 'Score must be a valid number' });
   }
 
-  // Ensure entry has an id
   if (!entry.id) {
     entry.id = Date.now() + Math.floor(Math.random() * 1000);
   }
   if (!entry.date) {
     entry.date = formatScoreTimestamp();
   }
+  entry.type = entry.type || 'quiz';
+  entry.topic = entry.topic || '';
 
   if (isMongoDBConnected) {
     try {
       const existingEntries = await Leaderboard.find({
-        name: new RegExp(`^${escapeRegExp(normalizedName)}$`, 'i')
+        name: new RegExp(`^${escapeRegExp(normalizedName)}$`, 'i'),
+        type: entry.type,
+        topic: entry.topic
       }).sort({ score: -1, _id: 1 });
 
       if (existingEntries.length > 0) {
         const [primaryEntry, ...duplicateEntries] = existingEntries;
 
         primaryEntry.score = score;
+        if (entry.maxScore) primaryEntry.maxScore = entry.maxScore;
         primaryEntry.date = entry.date;
+        primaryEntry.topic = entry.topic;
         await primaryEntry.save();
 
         if (duplicateEntries.length > 0) {
-          await Leaderboard.deleteMany({
-            _id: { $in: duplicateEntries.map(item => item._id) }
-          });
+          const duplicateIds = duplicateEntries.map(e => e._id);
+          await Leaderboard.deleteMany({ _id: { $in: duplicateIds } });
         }
 
         return res.json(primaryEntry);
       }
 
-      const newEntry = new Leaderboard({
-        name: normalizedName,
-        score,
-        date: entry.date,
-        id: entry.id
-      });
+      const newEntry = new Leaderboard({ ...entry, name: normalizedName, score, type: entry.type, topic: entry.topic, maxScore: entry.maxScore || 0 });
       await newEntry.save();
       return res.status(201).json(newEntry);
     } catch (err) {
@@ -868,34 +1044,30 @@ app.post('/leaderboard', async (req, res) => {
     }
   } else {
     const data = readFallbackData();
-    const existingEntries = data.leaderboard.filter(
-      item => item.name?.toLowerCase() === normalizedName.toLowerCase()
-    );
-
-    if (existingEntries.length > 0) {
-      const primaryEntry = existingEntries
-        .sort((a, b) => Number(b.score) - Number(a.score))[0];
-      const updatedEntry = {
-        ...primaryEntry,
-        score,
-        date: entry.date
-      };
-
-      data.leaderboard = [
-        ...data.leaderboard.filter(
-          item => item.name?.toLowerCase() !== normalizedName.toLowerCase()
-        ),
-        updatedEntry
-      ];
+    const existingIndex = data.leaderboard.findIndex(e => e.name.toLowerCase() === normalizedName.toLowerCase() && (e.type || 'quiz') === entry.type && (e.topic || '') === entry.topic);
+    
+    if (existingIndex >= 0) {
+      data.leaderboard[existingIndex].score = score;
+      if (entry.maxScore) data.leaderboard[existingIndex].maxScore = entry.maxScore;
+      data.leaderboard[existingIndex].date = entry.date;
+      data.leaderboard[existingIndex].topic = entry.topic;
+      
+      const filtered = data.leaderboard.filter((e, idx) => 
+        idx === existingIndex || e.name.toLowerCase() !== normalizedName.toLowerCase() || (e.type || 'quiz') !== entry.type || (e.topic || '') !== entry.topic
+      );
+      data.leaderboard = filtered;
       writeFallbackData(data);
-      return res.json(updatedEntry);
+      return res.json(data.leaderboard[existingIndex]);
     }
 
     const createdEntry = {
       name: normalizedName,
       score,
       date: entry.date,
-      id: entry.id
+      id: entry.id,
+      type: entry.type,
+      topic: entry.topic,
+      maxScore: entry.maxScore || 0
     };
     data.leaderboard.push(createdEntry);
     writeFallbackData(data);
@@ -933,6 +1105,570 @@ app.put('/leaderboard/:id', async (req, res) => {
  * POST /leaderboard creates a row for a new name, or updates score/date for
  * an existing name and removes older duplicate rows for that same name.
  */
+
+app.post('/api/interview/generate', async (req, res) => {
+  const { topic, numQuestions } = req.body;
+  if (!topic) return res.status(400).json({ error: 'Topic is required' });
+
+  const count = numQuestions || 10;
+
+  if (!process.env.GEMINI_API_KEY) {
+    // Fallback if no API key is provided
+    const dummyQuestions = Array.from({ length: count }).map((_, i) => ({
+      question: `(Dummy) Can you explain a core concept in ${topic}? (Question ${i + 1})`,
+      idealAnswer: `(Dummy) The ideal answer would explain the core concept in detail.`
+    }));
+    return res.json({ success: true, questions: dummyQuestions });
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `
+      You are an expert technical interviewer. Generate ${count} interview questions about "${topic}".
+      Return the response strictly as a JSON array of objects with the following format, and nothing else (no markdown blocks, no intro text):
+      [
+        {
+          "question": "The interview question text",
+          "idealAnswer": "A comprehensive but concise ideal answer expected from a candidate"
+        }
+      ]
+    `;
+
+    let cleanedText;
+    try {
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text();
+      cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    } catch (err) {
+      console.log("Gemini API Error. Falling back to Groq Llama 3...");
+      if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key_here') {
+        // Fallback to dummy if Groq isn't setup either
+        console.log("GROQ_API_KEY not set. Using dummy questions.");
+        const dummyQuestions = Array.from({ length: count }).map((_, i) => ({
+          question: `(Simulated due to API limit) Can you explain a core concept in ${topic}? (Question ${i + 1})`,
+          idealAnswer: `(Simulated) The ideal answer would explain the core concept in detail.`
+        }));
+        return res.json({ success: true, questions: dummyQuestions });
+      }
+      
+      const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [{ role: "user", content: prompt }],
+        model: "llama-3.3-70b-versatile",
+      });
+      const responseText = chatCompletion.choices[0].message.content;
+      cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    }
+
+    const questions = JSON.parse(cleanedText);
+
+    res.json({ success: true, questions });
+  } catch (error) {
+    console.error("AI Generation Error:", error);
+    res.status(500).json({ error: "Failed to generate interview questions" });
+  }
+});
+
+app.post('/api/interview/evaluate', async (req, res) => {
+  const { questions, userAnswers } = req.body;
+  if (!questions || !userAnswers) return res.status(400).json({ error: 'Questions and userAnswers required' });
+
+  if (!process.env.GEMINI_API_KEY) {
+    const dummyEvaluation = questions.map((_, i) => ({
+      score: 7,
+      feedback: "Dummy feedback: This is a simulated evaluation since no API key is provided."
+    }));
+    return res.json({ success: true, evaluation: dummyEvaluation });
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    const prompt = `
+      You are an expert technical interviewer evaluating a candidate's answers.
+      Here are the questions, the ideal answers, and the candidate's answers.
+      For each question, provide a score from 0 to 10 based on how well the candidate's answer matches the ideal answer. Also provide brief feedback.
+      If the user's answer is empty or nonsense, score it 0.
+      
+      Return strictly a JSON array of objects with the exact length of ${questions.length}:
+      [
+        {
+          "score": 8,
+          "feedback": "Short feedback here..."
+        }
+      ]
+      
+      Data to evaluate:
+      ${questions.map((q, i) => `
+        Q${i + 1}: ${q.question}
+        Ideal: ${q.idealAnswer}
+        User Answer: ${userAnswers[i] || ""}
+      `).join('\n')}
+    `;
+
+    let cleanedText;
+    try {
+      const result = await model.generateContent(prompt);
+      cleanedText = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+    } catch (err) {
+      console.log("Gemini API Error. Falling back to Groq Llama 3 for evaluation...");
+      if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key_here') {
+        const dummyEvaluation = questions.map((_, i) => ({
+          score: 7,
+          feedback: "Simulated feedback: You hit the Google API rate limit, and no Groq key was found!"
+        }));
+        return res.json({ success: true, evaluation: dummyEvaluation });
+      }
+
+      const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [{ role: "user", content: prompt }],
+        model: "llama-3.3-70b-versatile",
+      });
+      cleanedText = chatCompletion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+    }
+
+    const evaluation = JSON.parse(cleanedText);
+
+    res.json({ success: true, evaluation });
+  } catch (error) {
+    console.error("AI Evaluation Error:", error);
+    res.status(500).json({ error: "Failed to evaluate answers" });
+  }
+});
+
+// --- PROFILE UPDATE ENDPOINT ---
+app.put('/auth/update-profile', async (req, res) => {
+  const { userId, email, currentPassword, newPassword, profilePhoto, fullName, collegeName, branch, year, bio } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId is required' });
+
+  // Gmail validation
+  if (email && !/^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(email)) {
+    return res.status(400).json({ error: 'Only valid Gmail addresses are allowed (e.g., name@gmail.com).' });
+  }
+
+  if (isMongoDBConnected) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      // Password change flow
+      if (newPassword) {
+        if (!currentPassword) return res.status(400).json({ error: 'Current password is required to set a new password.' });
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) return res.status(400).json({ error: 'Current password is incorrect.' });
+        if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+        user.password = await bcrypt.hash(newPassword, 10);
+      }
+
+      if (email !== undefined) user.email = email;
+      if (profilePhoto !== undefined) user.profilePhoto = profilePhoto;
+      if (fullName !== undefined) user.fullName = fullName;
+      if (collegeName !== undefined) user.collegeName = collegeName;
+      if (branch !== undefined) user.branch = branch;
+      if (year !== undefined) user.year = year;
+      if (bio !== undefined) user.bio = bio;
+
+      await user.save();
+
+      res.json({
+        success: true,
+        user: {
+          username: user.username,
+          email: user.email,
+          profilePhoto: user.profilePhoto,
+          fullName: user.fullName,
+          collegeName: user.collegeName,
+          branch: user.branch,
+          year: user.year,
+          bio: user.bio,
+          createdAt: user.createdAt
+        }
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    // Fallback mode
+    const data = readFallbackData();
+    const user = data.users.find(u => (u.id || '').toString() === userId.toString());
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (newPassword) {
+      if (!currentPassword || currentPassword !== user.password) {
+        return res.status(400).json({ error: 'Current password is incorrect.' });
+      }
+      user.password = newPassword;
+    }
+    if (email !== undefined) user.email = email;
+    if (profilePhoto !== undefined) user.profilePhoto = profilePhoto;
+    if (fullName !== undefined) user.fullName = fullName;
+    if (collegeName !== undefined) user.collegeName = collegeName;
+    if (branch !== undefined) user.branch = branch;
+    if (year !== undefined) user.year = year;
+    if (bio !== undefined) user.bio = bio;
+
+    writeFallbackData(data);
+    res.json({ success: true, user: { username: user.username, email: user.email, profilePhoto: user.profilePhoto, fullName: user.fullName, collegeName: user.collegeName, branch: user.branch, year: user.year, bio: user.bio } });
+  }
+});
+
+// --- GET USER PROFILE ---
+app.get('/auth/profile/:userId', async (req, res) => {
+  const { userId } = req.params;
+  if (isMongoDBConnected) {
+    try {
+      const user = await User.findById(userId).select('-password');
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      res.json({ success: true, user });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const data = readFallbackData();
+    const user = data.users.find(u => (u.id || '').toString() === userId.toString());
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const { password, ...safeUser } = user;
+    res.json({ success: true, user: safeUser });
+  }
+});
+
+// --- INTERVIEW RESULT SAVE ---
+app.post('/api/interview/save', async (req, res) => {
+  const { userId, topic, overallScore, communicationScore, technicalScore, confidenceScore, feedbackSummary, strengths, areasForImprovement, questionCount } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId is required' });
+
+  const entry = {
+    userId, topic: topic || '', overallScore: overallScore || 0,
+    communicationScore: communicationScore || 0, technicalScore: technicalScore || 0,
+    confidenceScore: confidenceScore || 0, feedbackSummary: feedbackSummary || '',
+    strengths: strengths || [], areasForImprovement: areasForImprovement || [],
+    questionCount: questionCount || 0, date: new Date()
+  };
+
+  if (isMongoDBConnected) {
+    try {
+      const result = new InterviewResult(entry);
+      await result.save();
+      res.status(201).json({ success: true, result });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const data = readFallbackData();
+    if (!data.interviewResults) data.interviewResults = [];
+    entry.id = Date.now().toString();
+    data.interviewResults.push(entry);
+    writeFallbackData(data);
+    res.status(201).json({ success: true, result: entry });
+  }
+});
+
+// --- INTERVIEW HISTORY ---
+app.get('/api/interview/history/:userId', async (req, res) => {
+  const { userId } = req.params;
+  if (isMongoDBConnected) {
+    try {
+      const results = await InterviewResult.find({ userId }).sort({ date: -1 }).limit(50);
+      res.json({ success: true, results });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const data = readFallbackData();
+    const results = (data.interviewResults || []).filter(r => r.userId === userId).sort((a, b) => new Date(b.date) - new Date(a.date));
+    res.json({ success: true, results });
+  }
+});
+
+// --- AI RESUME-BASED MOCK INTERVIEW ENDPOINTS ---
+app.post('/api/resume/upload', async (req, res) => {
+  let filePath = '';
+  try {
+    await runResumeUpload(req, res);
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    filePath = req.file.path;
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId is required' });
+
+    const dataBuffer = fs.readFileSync(filePath);
+    const rawText = await extractResumeText(filePath, req.file, dataBuffer);
+
+    if (!rawText.trim()) {
+      return res.status(400).json({ error: 'Could not extract readable text from this resume. Please upload a text-based PDF or DOCX file.' });
+    }
+
+    // Call Gemini to parse the structured data
+    let structuredData = {
+      personalDetails: {}, education: [], skills: [], projects: [], experience: [],
+      certifications: [], achievements: [], technologies: [], publications: []
+    };
+
+    if (process.env.GEMINI_API_KEY) {
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const prompt = `Extract structured resume data from the following text.
+Return ONLY valid JSON matching this structure exactly (arrays of strings for most fields, object for personalDetails with name, email, phone):
+{
+  "personalDetails": {"name": "", "email": "", "phone": ""},
+  "education": [""],
+  "skills": [""],
+  "projects": [""],
+  "experience": [""],
+  "certifications": [""],
+  "achievements": [""],
+  "technologies": [""],
+  "publications": [""]
+}
+Text:
+${rawText.substring(0, 30000)}
+`;
+      try {
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        structuredData = JSON.parse(text);
+      } catch (err) {
+        console.error("Gemini Parsing Error:", err);
+      }
+    }
+
+    if (isMongoDBConnected) {
+      let doc = await ResumeData.findOne({ userId });
+      if (doc) {
+        Object.assign(doc, structuredData, { rawText, parsedAt: new Date() });
+      } else {
+        doc = new ResumeData({ userId, ...structuredData, rawText });
+      }
+      await doc.save();
+    } else {
+      const data = readFallbackData();
+      if (!data.resumeData) data.resumeData = [];
+      const idx = data.resumeData.findIndex(r => r.userId === userId);
+      if (idx !== -1) {
+        data.resumeData[idx] = { ...data.resumeData[idx], ...structuredData, rawText, parsedAt: new Date() };
+      } else {
+        data.resumeData.push({ id: Date.now().toString(), userId, ...structuredData, rawText, parsedAt: new Date() });
+      }
+      writeFallbackData(data);
+    }
+
+    res.json({ success: true, data: { ...structuredData, rawText, parsedAt: new Date() } });
+  } catch (err) {
+    console.error('Resume upload error:', err);
+    const isUnsupportedFile = err.message === 'Only PDF and DOCX files are allowed';
+    const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 413 : isUnsupportedFile ? 400 : 500);
+    const message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'Resume file is too large. Please upload a PDF or DOCX under 10MB.'
+      : isUnsupportedFile
+      ? 'Only PDF and DOCX files are allowed.'
+      : err.message || 'Resume upload failed.';
+    res.status(status).json({ error: message });
+  } finally {
+    cleanupUploadedFile(filePath || req.file?.path);
+  }
+});
+
+app.get('/api/resume/:userId', async (req, res) => {
+  const { userId } = req.params;
+  if (isMongoDBConnected) {
+    try {
+      const data = await ResumeData.findOne({ userId });
+      if (!data) return res.status(404).json({ error: 'Resume not found' });
+      res.json({ success: true, data });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const data = readFallbackData();
+    const resume = (data.resumeData || []).find(r => r.userId === userId);
+    if (!resume) return res.status(404).json({ error: 'Resume not found' });
+    res.json({ success: true, data: resume });
+  }
+});
+
+app.post('/api/resume/generate-questions', async (req, res) => {
+  const { userId, resumeText, difficulty, categories, countPerCategory } = req.body;
+  if (!resumeText) return res.status(400).json({ error: 'Resume text is required' });
+
+  if (!process.env.GEMINI_API_KEY) {
+    return res.json({
+      success: true,
+      questions: Array.from({ length: categories.length * (countPerCategory || 1) }).map((_, i) => ({
+        category: categories[Math.floor(i / (countPerCategory || 1))],
+        question: `Dummy ${difficulty} question ${i+1} about your resume`,
+        idealAnswer: `Expected ${difficulty} answer.`
+      }))
+    });
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `
+Generate an array of ${categories.length * (countPerCategory || 1)} mock interview questions based on the candidate's resume.
+Difficulty level: ${difficulty}.
+Categories needed: ${categories.join(', ')} (${countPerCategory} questions per category).
+Return ONLY a JSON array with this structure:
+[
+  { "category": "CategoryName", "question": "Question text", "idealAnswer": "Ideal answer text" }
+]
+Resume:
+${resumeText.substring(0, 15000)}
+`;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().replace(/\s*```json/g, '').replace(/```/g, '').trim();
+    const questions = JSON.parse(text);
+    res.json({ success: true, questions });
+  } catch (err) {
+    console.error('Question gen error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/resume/follow-up', async (req, res) => {
+  const { resumeText, currentQuestion, userAnswer } = req.body;
+  
+  if (!process.env.GEMINI_API_KEY) {
+    return res.json({ success: true, question: { question: "Dummy follow-up question based on your answer?", idealAnswer: "Expected follow-up answer." } });
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `
+You are an expert interviewer. Based on the candidate's answer to the current question, generate a single logical, probing follow-up question.
+Current Question: ${currentQuestion}
+Candidate's Answer: ${userAnswer}
+Return ONLY valid JSON: { "question": "Follow-up text", "idealAnswer": "Expected answer" }
+`;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().replace(/\s*```json/g, '').replace(/```/g, '').trim();
+    res.json({ success: true, question: JSON.parse(text) });
+  } catch (err) {
+    console.error('Follow-up error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/resume/evaluate-answer', async (req, res) => {
+  const { question, idealAnswer, userAnswer } = req.body;
+  if (!process.env.GEMINI_API_KEY) {
+    return res.json({ success: true, evaluation: { score: 7, feedback: "Good effort (dummy)." } });
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `
+Evaluate this interview answer out of 10.
+Q: ${question}
+Ideal: ${idealAnswer}
+Answer: ${userAnswer}
+Return ONLY JSON: { "score": 8, "feedback": "Short constructive feedback" }
+`;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().replace(/\s*```json/g, '').replace(/```/g, '').trim();
+    res.json({ success: true, evaluation: JSON.parse(text) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/resume/detect-ai', async (req, res) => {
+  const { answer } = req.body;
+  if (!process.env.GEMINI_API_KEY) {
+    return res.json({ success: true, detection: { aiLikelihood: 10, originalityScore: 90, personalizationScore: 85, confidenceScore: 80, explanation: "Dummy detection" } });
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `
+Analyze this answer for AI-generation likelihood. Look for generic explanations, lack of personalization, repetitive patterns, or overly formal language.
+Answer: ${answer}
+Return ONLY JSON: { "aiLikelihood": 15, "originalityScore": 85, "personalizationScore": 80, "confidenceScore": 90, "explanation": "Brief explanation" }
+`;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().replace(/\s*```json/g, '').replace(/```/g, '').trim();
+    res.json({ success: true, detection: JSON.parse(text) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/resume/final-report', async (req, res) => {
+  const { qaList } = req.body;
+  if (!process.env.GEMINI_API_KEY) {
+    return res.json({ success: true, report: { strengths: ["Good"], weaknesses: ["None"], sectionWisePerformance: {"General": "Good"}, hiringRecommendation: "Hire" } });
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `
+You are an expert tech hiring manager. Generate a final report based on this Q&A history.
+Q&A History: ${JSON.stringify(qaList.map(qa => ({ q: qa.question, a: qa.answer, score: qa.score })))}
+Return ONLY JSON:
+{
+  "strengths": ["string"],
+  "weaknesses": ["string"],
+  "sectionWisePerformance": { "Technical": "string feedback" },
+  "hiringRecommendation": "Strong Hire" // Choose from: Strong Hire, Hire, Borderline, No Hire
+}
+`;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().replace(/\s*```json/g, '').replace(/```/g, '').trim();
+    res.json({ success: true, report: JSON.parse(text) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/resume/save-session', async (req, res) => {
+  const entry = req.body;
+  if (!entry.userId) return res.status(400).json({ error: 'userId is required' });
+
+  if (isMongoDBConnected) {
+    try {
+      const result = new ResumeInterview({ ...entry, date: new Date() });
+      await result.save();
+      res.status(201).json({ success: true, result });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const data = readFallbackData();
+    if (!data.resumeInterviews) data.resumeInterviews = [];
+    const session = { ...entry, id: Date.now().toString(), date: new Date() };
+    data.resumeInterviews.push(session);
+    writeFallbackData(data);
+    res.status(201).json({ success: true, result: session });
+  }
+});
+
+app.get('/api/resume/history/:userId', async (req, res) => {
+  const { userId } = req.params;
+  if (isMongoDBConnected) {
+    try {
+      const results = await ResumeInterview.find({ userId }).sort({ date: -1 }).limit(20);
+      res.json({ success: true, results });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const data = readFallbackData();
+    const results = (data.resumeInterviews || []).filter(r => r.userId === userId).sort((a, b) => new Date(b.date) - new Date(a.date));
+    res.json({ success: true, results });
+  }
+});
+
+app.post('/api/resume/proctor-violation', async (req, res) => {
+  const { userId, eventType } = req.body;
+  console.log(`Proctoring violation logged for ${userId}: ${eventType}`);
+  res.json({ success: true });
+});
 
 // Start Express Server
 app.listen(PORT, () => {

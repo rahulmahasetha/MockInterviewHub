@@ -7,6 +7,14 @@ const UserProgressContext = createContext();
 const initialProgressState = {
   userId: null,
   username: null,
+  email: '',
+  profilePhoto: '',
+  fullName: '',
+  collegeName: '',
+  branch: '',
+  year: '',
+  bio: '',
+  createdAt: null,
   categories: {},
   science: { passed: [], score: 0 },
   jungle: { passed: [], score: 0 },
@@ -148,6 +156,24 @@ export function UserProgressProvider({ children }) {
         username: username
       };
 
+      // Fetch full user profile for new fields
+      try {
+        const profileRes = await authAPI.getProfile(userId);
+        if (profileRes.data?.success && profileRes.data.user) {
+          const p = profileRes.data.user;
+          finalProgress.email = p.email || '';
+          finalProgress.profilePhoto = p.profilePhoto || '';
+          finalProgress.fullName = p.fullName || '';
+          finalProgress.collegeName = p.collegeName || '';
+          finalProgress.branch = p.branch || '';
+          finalProgress.year = p.year || '';
+          finalProgress.bio = p.bio || '';
+          finalProgress.createdAt = p.createdAt || null;
+        }
+      } catch (e) {
+        console.log('Could not fetch extended profile, continuing...');
+      }
+
       if (dbProgressList.length > 0) {
         const dbProgress = dbProgressList[0];
         finalProgress = {
@@ -176,6 +202,38 @@ export function UserProgressProvider({ children }) {
       }
 
       const errMsg = error.response?.data?.error || 'Sign in failed. Check your credentials.';
+      toast.error(errMsg);
+      return { success: false, error: errMsg };
+    }
+  };
+
+  // Update user profile (photo, email, password, etc.)
+  const updateUserProfile = async (profileData) => {
+    try {
+      const response = await authAPI.updateProfile({ userId: progress.userId, ...profileData });
+      if (response.data?.success && response.data.user) {
+        const u = response.data.user;
+        setProgress(prev => ({
+          ...prev,
+          email: u.email ?? prev.email,
+          profilePhoto: u.profilePhoto ?? prev.profilePhoto,
+          fullName: u.fullName ?? prev.fullName,
+          collegeName: u.collegeName ?? prev.collegeName,
+          branch: u.branch ?? prev.branch,
+          year: u.year ?? prev.year,
+          bio: u.bio ?? prev.bio
+        }));
+        toast.success('Profile updated successfully!');
+        return { success: true };
+      }
+      return { success: false, error: 'Unknown error' };
+    } catch (error) {
+      console.error('Profile update error:', error);
+      if (!error.response || error.code === 'ERR_NETWORK') {
+        toast.error('Cannot reach the server.');
+        return { success: false, error: 'Server unreachable' };
+      }
+      const errMsg = error.response?.data?.error || 'Failed to update profile.';
       toast.error(errMsg);
       return { success: false, error: errMsg };
     }
@@ -386,7 +444,8 @@ export function UserProgressProvider({ children }) {
         signUpUser,
         logoutUser,
         forgotPasswordUser,
-        fetchGlobalLeaderboard
+        fetchGlobalLeaderboard,
+        updateUserProfile
       }}
     >
       {children}
