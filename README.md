@@ -1,19 +1,6 @@
-# TriviaTrek Adventure (Minimal Create-React-App scaffold)
+# MockInterviewHub (AI-Powered Career Preparation Platform) 
+1. Built a full-stack AI-powered career preparation platform using React.js, Node.js, Express.js, MongoDB, and REST APIs, featuring resume analysis, mock interviews, user authentication, and personalized learning.
 
-This is a minimal React project scaffold for the TriviaTrek Adventure app.
-It includes:
-- Home page with category cards
-- Per-category playground with clickable level markers on a map image
-- MCQ card with hint support
-- Sample JSON question data (1-2 questions per category)
-- LocalStorage-based progress saving
+2. Developed an AI-powered Resume Assistant and Mock Interview system with resume analysis, skill-gap detection, written and voice-based technical interviews, instant feedback, and performance tracking.
 
-To run:
-1. npm install
-2. npm start
-
-<img width="1365" height="767" alt="Screenshot 2026-05-14 001432" src="https://github.com/user-attachments/assets/45f529e8-1c45-4141-a0c2-e8285c6b8762" />
-<img width="1358" height="767" alt="Screenshot 2026-05-14 001456" src="https://github.com/user-attachments/assets/39750676-8bd6-42d2-94a6-a7d36c8fa280" />
-<img width="1353" height="763" alt="Screenshot 2026-05-14 001530" src="https://github.com/user-attachments/assets/4a44b913-49b3-408e-88fb-4784e41633ec" />
-
-
+3. Improved application performance through optimized API communication and frontend rendering, enabling faster question generation, responsive user interactions, and real-time progress tracking across mock interview sessions
