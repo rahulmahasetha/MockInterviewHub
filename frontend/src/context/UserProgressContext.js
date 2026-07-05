@@ -21,8 +21,36 @@ const initialProgressState = {
   math: { passed: [], score: 0 },
   history: { passed: [], score: 0 },
   highestScore: 0,
-  leaderboard: []
+  leaderboard: [],
+  coins: 0,
+  coinHistory: [],
+  streakDays: 1,
+  lastLoginRewardDate: null
 };
+
+export const COIN_REWARDS = {
+  DAILY_LOGIN: { label: 'Daily Login', coins: 20 },
+  COMPLETE_QUIZ: { label: 'Complete a Quiz', coins: 10 },
+  PERFECT_SCORE: { label: 'Score 100%', coins: 30, suffix: 'Bonus' },
+  ANSWER_CORRECTLY: { label: 'Answer Correctly', coins: 5, suffix: 'question' },
+  FINISH_UNDER_TIME: { label: 'Finish Under Time', coins: 20 },
+  SEVEN_DAY_STREAK: { label: '7-Day Streak', coins: 100 },
+  THIRTY_DAY_STREAK: { label: '30-Day Streak', coins: 500 },
+  COMPLETE_TOPIC: { label: 'Complete a Topic', coins: 150 },
+  COMPLETE_ALL_LEVELS: { label: 'Complete All Levels', coins: 500 },
+  AI_MOCK_INTERVIEW: { label: 'AI Mock Interview Completed', coins: 100 },
+  EXCELLENT_INTERVIEW: { label: 'Excellent Interview Score (>90%)', coins: 150 },
+  FIRST_ATTEMPT_PERFECT: { label: 'First Attempt Perfect Score', coins: 50 },
+  NO_PROCTORING_VIOLATIONS: { label: 'No Proctoring Violations', coins: 30 },
+  REFER_FRIEND: { label: 'Refer a Friend', coins: 200 },
+  DAILY_CHALLENGE: { label: 'Complete Daily Challenge', coins: 75 },
+  WEEKLY_WINNER: { label: 'Weekly Challenge Winner', coins: 500 },
+  MONTHLY_TOP_10: { label: 'Monthly Leaderboard Top 10', coins: 1000 },
+  CODING_CHALLENGE: { label: 'Solve Coding Challenge', coins: 80 },
+  ACCURACY_STREAK: { label: 'Maintain 95% Accuracy (10 quizzes)', coins: 200 }
+};
+
+const todayKey = () => new Date().toISOString().slice(0, 10);
 
 const formatScoreTimestamp = () => {
   return new Date().toLocaleString(undefined, {
@@ -245,7 +273,50 @@ export function UserProgressProvider({ children }) {
     toast.info("Signed out successfully.");
   };
 
-  const markPassed = (category, level) => {
+  const awardCoins = (rewardKey, details = {}) => {
+    const reward = COIN_REWARDS[rewardKey];
+    if (!reward) return;
+
+    setProgress(prev => {
+      const amount = details.coins ?? reward.coins;
+      const nextHistory = [
+        {
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          activity: details.label || reward.label,
+          coins: amount,
+          source: rewardKey,
+          date: formatScoreTimestamp()
+        },
+        ...(prev.coinHistory || [])
+      ].slice(0, 30);
+
+      return {
+        ...prev,
+        coins: (prev.coins || 0) + amount,
+        coinHistory: nextHistory
+      };
+    });
+
+    toast.success(`+${details.coins ?? reward.coins} coins: ${details.label || reward.label}`);
+  };
+
+  const claimDailyLoginReward = () => {
+    const today = todayKey();
+    if (progress.lastLoginRewardDate === today) {
+      toast.info('Daily login reward already claimed today.');
+      return false;
+    }
+
+    setProgress(prev => ({
+      ...prev,
+      lastLoginRewardDate: today,
+      streakDays: Math.max(prev.streakDays || 1, 1)
+    }));
+    awardCoins('DAILY_LOGIN');
+    return true;
+  };
+
+  const markPassed = (category, level, rewardMeta = {}) => {
     setProgress((prev) => {
       const currentCategories = prev.categories || {};
       const categoryProgress = currentCategories[category] || prev[category] || { passed: [], score: 0 };
@@ -259,10 +330,38 @@ export function UserProgressProvider({ children }) {
       }
 
       const newPassed = [...new Set([...categoryProgress.passed, levelIndex])];
-      const newScore = categoryProgress.score + 20;
+      const scoreIncrement = rewardMeta.scoreIncrement ?? 20;
+      const newScore = categoryProgress.score + scoreIncrement;
+      const isTopicComplete = rewardMeta.totalLevels && newPassed.length >= rewardMeta.totalLevels;
+      const rewardEntries = [
+        { key: 'ANSWER_CORRECTLY', label: `${category} level ${level} correct`, coins: COIN_REWARDS.ANSWER_CORRECTLY.coins },
+        { key: 'COMPLETE_QUIZ', label: `Completed ${category} level ${level}`, coins: COIN_REWARDS.COMPLETE_QUIZ.coins }
+      ];
+
+      if (rewardMeta.finishedUnderTime) {
+        rewardEntries.push({ key: 'FINISH_UNDER_TIME', label: `Finished ${category} level ${level} under time`, coins: COIN_REWARDS.FINISH_UNDER_TIME.coins });
+      }
+
+      if (isTopicComplete) {
+        rewardEntries.push({ key: 'COMPLETE_TOPIC', label: `Completed ${category} topic`, coins: COIN_REWARDS.COMPLETE_TOPIC.coins });
+        rewardEntries.push({ key: 'COMPLETE_ALL_LEVELS', label: `Completed all ${category} levels`, coins: COIN_REWARDS.COMPLETE_ALL_LEVELS.coins });
+      }
+
+      const earnedCoins = rewardEntries.reduce((total, reward) => total + reward.coins, 0);
 
       const updatedProgress = {
         ...prev,
+        coins: (prev.coins || 0) + earnedCoins,
+        coinHistory: [
+          ...rewardEntries.map(reward => ({
+            id: Date.now() + Math.floor(Math.random() * 1000) + Math.floor(Math.random() * 1000),
+            activity: reward.label,
+            coins: reward.coins,
+            source: reward.key,
+            date: formatScoreTimestamp()
+          })),
+          ...(prev.coinHistory || [])
+        ].slice(0, 30),
         categories: {
           ...currentCategories,
           [category]: {
@@ -285,7 +384,7 @@ export function UserProgressProvider({ children }) {
         return total;
       }, 0);
 
-      toast.success(`+20 points! Level ${level} completed!`);
+      toast.success(`+${earnedCoins} coins earned! Level ${level} completed.`);
 
       return {
         ...updatedProgress,
@@ -438,6 +537,8 @@ export function UserProgressProvider({ children }) {
         updateHighestScore,
         saveToLeaderboard,
         resetProgress,
+        awardCoins,
+        claimDailyLoginReward,
         getTotalScore,
         getCategoryProgress,
         signInUser,

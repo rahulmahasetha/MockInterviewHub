@@ -1,17 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { interviewAPI, leaderboardAPI } from '../services/api';
 import { useUserProgress } from '../context/UserProgressContext';
 import { FaRobot, FaArrowLeft, FaCheckCircle, FaSpinner, FaMicrophone, FaStop } from 'react-icons/fa';
+import ProctorPanel from './ProctorPanel';
 
 export default function MockInterview() {
   const navigate = useNavigate();
+  const MAX_VIOLATIONS = 3;
   const [step, setStep] = useState('setup'); // setup, session, summary
   const [topic, setTopic] = useState('React');
   const [numQuestions, setNumQuestions] = useState(5);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { progress } = useUserProgress();
+  const { progress, awardCoins } = useUserProgress();
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState([]);
@@ -19,6 +21,7 @@ export default function MockInterview() {
   const [evaluations, setEvaluations] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
   const [interviewMode, setInterviewMode] = useState('written'); // 'written' or 'speaking'
+  const [violations, setViolations] = useState(0);
   const recognitionRef = useRef(null);
 
   useEffect(() => {
@@ -88,6 +91,11 @@ export default function MockInterview() {
     "Express", "MongoDB", "Java", "C++", "Python", "Full Stack"
   ];
 
+  const handleProctorViolation = useCallback(() => {
+    if (step !== 'session') return;
+    setViolations(prev => Math.min(prev + 1, MAX_VIOLATIONS));
+  }, [step]);
+
   const handleStart = async () => {
     setIsLoading(true);
     try {
@@ -95,6 +103,7 @@ export default function MockInterview() {
       if (response.data.success && response.data.questions.length > 0) {
         setQuestions(response.data.questions);
         setUserAnswers(new Array(response.data.questions.length).fill(""));
+        setViolations(0);
         setStep('session');
       } else {
         alert("Failed to generate questions. Please try again.");
@@ -122,13 +131,18 @@ export default function MockInterview() {
         if (response.data.success) {
           setEvaluations(response.data.evaluation);
           const totalScore = response.data.evaluation.reduce((acc, curr) => acc + (curr.score || 0), 0);
+          const maxScore = questions.length * 10;
+          const overallPercent = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+          awardCoins('AI_MOCK_INTERVIEW');
+          if (overallPercent > 90) awardCoins('EXCELLENT_INTERVIEW');
+          if (violations === 0) awardCoins('NO_PROCTORING_VIOLATIONS');
           
           if (progress?.username) {
             try {
               await leaderboardAPI.addToLeaderboard({
                 name: progress.username,
                 score: totalScore,
-                maxScore: questions.length * 10,
+                maxScore,
                 type: 'interview',
                 topic: topic
               });
@@ -197,11 +211,12 @@ export default function MockInterview() {
     setUserAnswers([]);
     setCurrentAnswer("");
     setEvaluations([]);
+    setViolations(0);
   };
 
   return (
     <div className="dashboard-container app-shell" style={{ minHeight: '100vh', padding: '40px 20px' }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+      <div style={{ maxWidth: step === 'session' ? '1180px' : '800px', margin: '0 auto', width: '100%' }}>
         
         {/* SETUP STEP */}
         {step === 'setup' && (
@@ -259,77 +274,88 @@ export default function MockInterview() {
 
         {/* SESSION STEP */}
         {step === 'session' && (
-          <div className="auth-card" style={{ maxWidth: '100%', margin: '0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px solid #e2e8f0' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#1e293b' }}>{topic} Interview</h2>
-              <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '6px 12px', borderRadius: '999px', fontWeight: 700, fontSize: '0.85rem' }}>
-                Question {currentIndex + 1} of {questions.length}
-              </span>
-            </div>
+          <div className="interview-proctor-layout">
+            <div className="auth-card interview-session-card" style={{ maxWidth: '100%', margin: '0 auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px solid #e2e8f0', gap: '12px', flexWrap: 'wrap' }}>
+                <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#1e293b' }}>{topic} Interview</h2>
+                <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '6px 12px', borderRadius: '999px', fontWeight: 700, fontSize: '0.85rem' }}>
+                  Question {currentIndex + 1} of {questions.length}
+                </span>
+              </div>
 
-            <div style={{ marginBottom: '25px' }}>
-              <h3 style={{ fontSize: '1.15rem', color: '#0f172a', lineHeight: 1.5, margin: '0 0 15px 0' }}>
-                <span style={{ color: '#3b82f6', marginRight: '10px' }}>Q:</span>
-                {questions[currentIndex].question}
-              </h3>
-            </div>
+              <div style={{ marginBottom: '25px' }}>
+                <h3 style={{ fontSize: '1.15rem', color: '#0f172a', lineHeight: 1.5, margin: '0 0 15px 0' }}>
+                  <span style={{ color: '#3b82f6', marginRight: '10px' }}>Q:</span>
+                  {questions[currentIndex].question}
+                </h3>
+              </div>
 
-            {interviewMode === 'speaking' ? (
-              <div className="form-group" style={{ marginBottom: '25px', textAlign: 'center' }}>
-                <button 
-                  type="button"
-                  onClick={toggleRecording}
-                  style={{
-                    background: isRecording ? '#fee2e2' : '#eff6ff',
-                    color: isRecording ? '#dc2626' : '#2563eb',
-                    border: isRecording ? '2px solid #fca5a5' : '2px solid #bfdbfe',
-                    padding: '20px 40px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '10px',
-                    fontSize: '1.2rem',
-                    fontWeight: 700,
-                    transition: 'all 0.2s',
-                    width: '100%',
-                    marginBottom: '15px'
-                  }}
-                >
-                  {isRecording ? <><FaStop style={{ fontSize: '2rem' }} /> Stop Recording</> : <><FaMicrophone style={{ fontSize: '2rem' }} /> Tap to Speak Answer</>}
-                </button>
-                <div style={{ textAlign: 'left' }}>
-                  <label className="form-label" style={{ marginBottom: '8px', color: '#64748b', fontSize: '0.85rem' }}>Live Transcript (You can edit this if needed):</label>
+              {interviewMode === 'speaking' ? (
+                <div className="form-group" style={{ marginBottom: '25px', textAlign: 'center' }}>
+                  <button 
+                    type="button"
+                    onClick={toggleRecording}
+                    style={{
+                      background: isRecording ? '#fee2e2' : '#eff6ff',
+                      color: isRecording ? '#dc2626' : '#2563eb',
+                      border: isRecording ? '2px solid #fca5a5' : '2px solid #bfdbfe',
+                      padding: '20px 40px',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '10px',
+                      fontSize: '1.2rem',
+                      fontWeight: 700,
+                      transition: 'all 0.2s',
+                      width: '100%',
+                      marginBottom: '15px'
+                    }}
+                  >
+                    {isRecording ? <><FaStop style={{ fontSize: '2rem' }} /> Stop Recording</> : <><FaMicrophone style={{ fontSize: '2rem' }} /> Tap to Speak Answer</>}
+                  </button>
+                  <div style={{ textAlign: 'left' }}>
+                    <label className="form-label" style={{ marginBottom: '8px', color: '#64748b', fontSize: '0.85rem' }}>Live Transcript (You can edit this if needed):</label>
+                    <textarea 
+                      className="auth-input" 
+                      rows="4" 
+                      placeholder="Your spoken words will appear here..."
+                      value={currentAnswer}
+                      onChange={(e) => setCurrentAnswer(e.target.value)}
+                      style={{ resize: 'vertical', background: '#f8fafc' }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="form-group" style={{ marginBottom: '25px' }}>
+                  <label className="form-label" style={{ marginBottom: '10px' }}>Your Answer:</label>
                   <textarea 
                     className="auth-input" 
-                    rows="4" 
-                    placeholder="Your spoken words will appear here..."
+                    rows="6" 
+                    placeholder="Type your detailed answer here..."
                     value={currentAnswer}
                     onChange={(e) => setCurrentAnswer(e.target.value)}
-                    style={{ resize: 'vertical', background: '#f8fafc' }}
+                    style={{ resize: 'vertical' }}
                   />
                 </div>
-              </div>
-            ) : (
-              <div className="form-group" style={{ marginBottom: '25px' }}>
-                <label className="form-label" style={{ marginBottom: '10px' }}>Your Answer:</label>
-                <textarea 
-                  className="auth-input" 
-                  rows="6" 
-                  placeholder="Type your detailed answer here..."
-                  value={currentAnswer}
-                  onChange={(e) => setCurrentAnswer(e.target.value)}
-                  style={{ resize: 'vertical' }}
-                />
-              </div>
-            )}
+              )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="auth-submit-btn" onClick={handleNext} disabled={!currentAnswer.trim() || isLoading} style={{ width: 'auto', padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {isLoading ? <><FaSpinner className="fa-spin" /> Evaluating...</> : (currentIndex < questions.length - 1 ? 'Next Question' : 'Finish Interview')}
-              </button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="auth-submit-btn" onClick={handleNext} disabled={!currentAnswer.trim() || isLoading} style={{ width: 'auto', padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {isLoading ? <><FaSpinner className="fa-spin" /> Evaluating...</> : (currentIndex < questions.length - 1 ? 'Next Question' : 'Finish Interview')}
+                </button>
+              </div>
             </div>
+
+            <ProctorPanel
+              active={step === 'session'}
+              title="Interview Proctor"
+              subtitle="Camera, mic, focus, fullscreen"
+              violations={violations}
+              maxViolations={MAX_VIOLATIONS}
+              onTabSwitch={handleProctorViolation}
+            />
           </div>
         )}
 

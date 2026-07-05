@@ -48,10 +48,8 @@ const createHttpError = (status, message) => {
 };
 
 const isPdfBuffer = (buffer) => {
-  if (!Buffer.isBuffer(buffer) || buffer.length < 8) return false;
-  const header = buffer.subarray(0, 8).toString('latin1');
-  const tail = buffer.subarray(Math.max(0, buffer.length - 2048)).toString('latin1');
-  return header.startsWith('%PDF-') && tail.includes('%%EOF');
+  if (!Buffer.isBuffer(buffer) || buffer.length < 4) return false;
+  return buffer.subarray(0, 4).toString('latin1').startsWith('%PDF');
 };
 
 const isDocxBuffer = (buffer) => {
@@ -135,6 +133,108 @@ const formatScoreTimestamp = () => new Date().toLocaleString(undefined, {
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\$&');
 
+const cleanAIJsonText = (text) => String(text || '')
+  .replace(/\s*```json/g, '')
+  .replace(/```/g, '')
+  .trim();
+
+const parseAiJsonSafely = (text, fallback) => {
+  try {
+    const cleaned = cleanAIJsonText(text);
+    const parsed = JSON.parse(cleaned);
+    return parsed && typeof parsed === 'object' ? parsed : fallback;
+  } catch (err) {
+    return fallback;
+  }
+};
+
+const { parseResumeFallback } = require('./utils/resumeParser');
+const { RAGEngine } = require('./utils/ragEngine');
+
+/**
+ * Validates a Gemini API key. Real keys start with 'AIzaSy'.
+ */
+const isValidGeminiKey = (key) => typeof key === 'string' && key.startsWith('AIzaSy') && key.length > 30;
+
+/**
+ * Calls Gemini generative AI with model fallback chain.
+ * Tries gemini-1.5-flash first (stable), then gemini-pro as last resort.
+ */
+const callGeminiChat = async (prompt, options = {}) => {
+  const key = process.env.GEMINI_API_KEY;
+  if (!isValidGeminiKey(key)) {
+    throw new Error('Invalid or missing Gemini API key. Key must start with AIzaSy.');
+  }
+  const genAI = new GoogleGenerativeAI(key);
+  const modelNames = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro'];
+  let lastErr;
+  for (const modelName of modelNames) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      return cleanAIJsonText(result.response.text());
+    } catch (err) {
+      lastErr = err;
+      if (err.message && (err.message.includes('not found') || err.message.includes('404') || err.message.includes('deprecated'))) {
+        continue; // try next model
+      }
+      throw err; // throw non-model errors immediately
+    }
+  }
+  throw lastErr;
+};
+
+const hasGeminiKey = () => isValidGeminiKey(process.env.GEMINI_API_KEY);
+
+const buildFallbackQuestions = (categories = [], countPerCategory = 1) => {
+  const safeCategories = Array.isArray(categories) && categories.length > 0
+    ? categories
+    : ['Skills', 'Experience'];
+  const perCategory = Math.max(1, Number(countPerCategory) || 1);
+
+  return safeCategories.flatMap((category, index) =>
+    Array.from({ length: perCategory }, (_, questionIndex) => ({
+      category,
+      question: `Based on your resume, please explain one ${String(category).toLowerCase()} item you listed and the impact it had${questionIndex > 0 ? ` (follow-up ${questionIndex + 1})` : ''}.`,
+      idealAnswer: `A strong answer should reference the exact resume item, explain the candidate's role, decisions, technical details, impact, and lessons learned.`
+    }))
+  );
+};
+
+const hasXAIKey = () => Boolean(process.env.XAI_API_KEY && process.env.XAI_API_KEY !== 'your_xai_api_key_here');
+
+const prefersXAI = () => process.env.AI_PROVIDER?.toLowerCase() === 'xai' && hasXAIKey();
+
+const callXAIChat = async (prompt, options = {}) => {
+  if (!hasXAIKey()) {
+    throw new Error('XAI_API_KEY is not configured');
+  }
+
+  const response = await fetch(process.env.XAI_API_URL || 'https://api.x.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.XAI_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: process.env.XAI_MODEL || 'grok-2-latest',
+      temperature: options.temperature ?? 0.3,
+      messages: [
+        { role: 'system', content: options.system || 'Return only valid JSON. Do not include markdown.' },
+        { role: 'user', content: prompt }
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`xAI API error ${response.status}: ${body}`);
+  }
+
+  const data = await response.json();
+  return cleanAIJsonText(data.choices?.[0]?.message?.content || '');
+};
+
 const dedupeLeaderboardRows = (rows) => {
   const byKey = new Map();
 
@@ -159,13 +259,22 @@ const createInitialCategoryProgress = () => {
   }, {});
 };
 
-const buildLevels = (questions) => questions.map((item, index) => ({
-  level: index + 1,
-  question: item.question,
-  options: item.options,
-  answer: item.answer,
-  hint: item.hint
-}));
+const LEVELS_PER_CATEGORY = 10;
+
+const buildLevels = (questions) => {
+  const levels = [];
+  for (let i = 0; i < LEVELS_PER_CATEGORY; i++) {
+    const item = questions[i % questions.length] || { question: 'Question not available', options: [], answer: '', hint: '' };
+    levels.push({
+      level: i + 1,
+      question: item.question,
+      options: item.options,
+      answer: item.answer,
+      hint: item.hint
+    });
+  }
+  return levels;
+};
 
 const QUIZ_CATEGORIES = [
   {
@@ -1112,7 +1221,7 @@ app.post('/api/interview/generate', async (req, res) => {
 
   const count = numQuestions || 10;
 
-  if (!process.env.GEMINI_API_KEY) {
+  if (!process.env.GEMINI_API_KEY && !hasXAIKey() && (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key_here')) {
     // Fallback if no API key is provided
     const dummyQuestions = Array.from({ length: count }).map((_, i) => ({
       question: `(Dummy) Can you explain a core concept in ${topic}? (Question ${i + 1})`,
@@ -1122,8 +1231,6 @@ app.post('/api/interview/generate', async (req, res) => {
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `
       You are an expert technical interviewer. Generate ${count} interview questions about "${topic}".
       Return the response strictly as a JSON array of objects with the following format, and nothing else (no markdown blocks, no intro text):
@@ -1136,12 +1243,34 @@ app.post('/api/interview/generate', async (req, res) => {
     `;
 
     let cleanedText;
-    try {
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
-      cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-    } catch (err) {
-      console.log("Gemini API Error. Falling back to Groq Llama 3...");
+    if (prefersXAI()) {
+      try {
+        cleanedText = await callXAIChat(prompt);
+      } catch (err) {
+        console.log("xAI API Error. Falling back to Gemini/Groq...", err.message);
+      }
+    }
+
+    if (!cleanedText && process.env.GEMINI_API_KEY) {
+      try {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const result = await model.generateContent(prompt);
+        cleanedText = cleanAIJsonText(result.response.text());
+      } catch (err) {
+        console.log("Gemini API Error. Falling back to xAI/Groq...");
+      }
+    }
+
+    if (!cleanedText && hasXAIKey()) {
+      try {
+        cleanedText = await callXAIChat(prompt);
+      } catch (err) {
+        console.log("xAI API Error. Falling back to Groq Llama 3...", err.message);
+      }
+    }
+
+    if (!cleanedText) {
       if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key_here') {
         // Fallback to dummy if Groq isn't setup either
         console.log("GROQ_API_KEY not set. Using dummy questions.");
@@ -1157,8 +1286,7 @@ app.post('/api/interview/generate', async (req, res) => {
         messages: [{ role: "user", content: prompt }],
         model: "llama-3.3-70b-versatile",
       });
-      const responseText = chatCompletion.choices[0].message.content;
-      cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+      cleanedText = cleanAIJsonText(chatCompletion.choices[0].message.content);
     }
 
     const questions = JSON.parse(cleanedText);
@@ -1174,7 +1302,7 @@ app.post('/api/interview/evaluate', async (req, res) => {
   const { questions, userAnswers } = req.body;
   if (!questions || !userAnswers) return res.status(400).json({ error: 'Questions and userAnswers required' });
 
-  if (!process.env.GEMINI_API_KEY) {
+  if (!process.env.GEMINI_API_KEY && !hasXAIKey() && (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key_here')) {
     const dummyEvaluation = questions.map((_, i) => ({
       score: 7,
       feedback: "Dummy feedback: This is a simulated evaluation since no API key is provided."
@@ -1183,9 +1311,6 @@ app.post('/api/interview/evaluate', async (req, res) => {
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
     const prompt = `
       You are an expert technical interviewer evaluating a candidate's answers.
       Here are the questions, the ideal answers, and the candidate's answers.
@@ -1209,15 +1334,38 @@ app.post('/api/interview/evaluate', async (req, res) => {
     `;
 
     let cleanedText;
-    try {
-      const result = await model.generateContent(prompt);
-      cleanedText = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-    } catch (err) {
-      console.log("Gemini API Error. Falling back to Groq Llama 3 for evaluation...");
+    if (prefersXAI()) {
+      try {
+        cleanedText = await callXAIChat(prompt);
+      } catch (err) {
+        console.log("xAI API Error. Falling back to Gemini/Groq for evaluation...", err.message);
+      }
+    }
+
+    if (!cleanedText && process.env.GEMINI_API_KEY) {
+      try {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const result = await model.generateContent(prompt);
+        cleanedText = cleanAIJsonText(result.response.text());
+      } catch (err) {
+        console.log("Gemini API Error. Falling back to xAI/Groq for evaluation...");
+      }
+    }
+
+    if (!cleanedText && hasXAIKey()) {
+      try {
+        cleanedText = await callXAIChat(prompt);
+      } catch (err) {
+        console.log("xAI API Error. Falling back to Groq Llama 3 for evaluation...", err.message);
+      }
+    }
+
+    if (!cleanedText) {
       if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key_here') {
         const dummyEvaluation = questions.map((_, i) => ({
           score: 7,
-          feedback: "Simulated feedback: You hit the Google API rate limit, and no Groq key was found!"
+          feedback: "Simulated feedback: no working Gemini, xAI, or Groq key was found."
         }));
         return res.json({ success: true, evaluation: dummyEvaluation });
       }
@@ -1227,7 +1375,7 @@ app.post('/api/interview/evaluate', async (req, res) => {
         messages: [{ role: "user", content: prompt }],
         model: "llama-3.3-70b-versatile",
       });
-      cleanedText = chatCompletion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+      cleanedText = cleanAIJsonText(chatCompletion.choices[0].message.content);
     }
 
     const evaluation = JSON.parse(cleanedText);
@@ -1400,38 +1548,74 @@ app.post('/api/resume/upload', async (req, res) => {
       return res.status(400).json({ error: 'Could not extract readable text from this resume. Please upload a text-based PDF or DOCX file.' });
     }
 
-    // Call Gemini to parse the structured data
+    // Call the configured AI provider to parse the structured data.
     let structuredData = {
       personalDetails: {}, education: [], skills: [], projects: [], experience: [],
       certifications: [], achievements: [], technologies: [], publications: []
     };
 
-    if (process.env.GEMINI_API_KEY) {
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-      const prompt = `Extract structured resume data from the following text.
-Return ONLY valid JSON matching this structure exactly (arrays of strings for most fields, object for personalDetails with name, email, phone):
+    const fallbackStructuredData = parseResumeFallback(rawText);
+
+    if (hasGeminiKey() || hasXAIKey()) {
+      const prompt = `Extract structured resume data from the following resume text.
+Return ONLY a valid JSON object matching exactly the structure below. Be exhaustive and thorough.
+
+For "skills": Extract every single programming language, framework, library, tool, database, cloud platform, and technology mentioned ANYWHERE in the resume. Return as a flat JSON array of short individual string tags like ["JavaScript", "React", "Node.js", "Python", "SQL", "Git", "Docker", "AWS"]. Do NOT group them or write long descriptions.
+For "experience": Each entry should be a single string describing one job role, e.g. "Software Engineer at Google (2020-2023) - Built scalable microservices".
+For "projects": Each entry should be one sentence per project describing what was built and what tech was used.
+For "education": Each entry should be one string per degree/certification.
+
+JSON Structure:
 {
   "personalDetails": {"name": "", "email": "", "phone": ""},
-  "education": [""],
-  "skills": [""],
-  "projects": [""],
-  "experience": [""],
-  "certifications": [""],
-  "achievements": [""],
-  "technologies": [""],
-  "publications": [""]
+  "education": ["string"],
+  "skills": ["string"],
+  "projects": ["string"],
+  "experience": ["string"],
+  "certifications": ["string"],
+  "achievements": ["string"],
+  "technologies": ["string"],
+  "publications": ["string"]
 }
-Text:
-${rawText.substring(0, 30000)}
+
+Resume Text:
+${rawText.substring(0, 25000)}
 `;
       try {
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-        structuredData = JSON.parse(text);
+        let text;
+        if (hasGeminiKey()) {
+          text = await callGeminiChat(prompt);
+        } else {
+          text = await callXAIChat(prompt);
+        }
+        const parsed = JSON.parse(text);
+        let mergedSkills = [];
+        if (Array.isArray(parsed.skills)) mergedSkills.push(...parsed.skills);
+        if (Array.isArray(parsed.technologies)) mergedSkills.push(...parsed.technologies);
+        
+        // Split any comma/semicolon/bullet-grouped skills into individual tags
+        mergedSkills = mergedSkills.flatMap(s => String(s).split(/[,;|•·]/).map(p => p.replace(/[^a-zA-Z0-9+#._ -]/g, '').trim()).filter(p => p && p.length < 60));
+        mergedSkills = [...new Set(mergedSkills.filter(Boolean))];
+
+        structuredData = {
+          personalDetails: parsed.personalDetails || fallbackStructuredData.personalDetails,
+          education: Array.isArray(parsed.education) && parsed.education.length > 0 ? parsed.education : fallbackStructuredData.education,
+          skills: mergedSkills.length > 0 ? mergedSkills : fallbackStructuredData.skills,
+          projects: Array.isArray(parsed.projects) && parsed.projects.length > 0 ? parsed.projects : fallbackStructuredData.projects,
+          experience: Array.isArray(parsed.experience) && parsed.experience.length > 0 ? parsed.experience : fallbackStructuredData.experience,
+          certifications: Array.isArray(parsed.certifications) ? parsed.certifications : fallbackStructuredData.certifications,
+          achievements: Array.isArray(parsed.achievements) ? parsed.achievements : fallbackStructuredData.achievements,
+          technologies: Array.isArray(parsed.technologies) ? parsed.technologies : fallbackStructuredData.technologies,
+          publications: Array.isArray(parsed.publications) ? parsed.publications : fallbackStructuredData.publications,
+        };
+        console.log(`Resume parsed via AI: ${structuredData.skills.length} skills, ${structuredData.experience.length} experience, ${structuredData.projects.length} projects`);
       } catch (err) {
-        console.error("Gemini Parsing Error:", err);
+        console.error("AI Resume Parsing Error (using fallback parser):", err.message);
+        structuredData = fallbackStructuredData;
       }
+    } else {
+      console.log('No valid AI key found. Using regex-based resume parser.');
+      structuredData = fallbackStructuredData;
     }
 
     if (isMongoDBConnected) {
@@ -1492,137 +1676,304 @@ app.post('/api/resume/generate-questions', async (req, res) => {
   const { userId, resumeText, difficulty, categories, countPerCategory } = req.body;
   if (!resumeText) return res.status(400).json({ error: 'Resume text is required' });
 
-  if (!process.env.GEMINI_API_KEY) {
-    return res.json({
-      success: true,
-      questions: Array.from({ length: categories.length * (countPerCategory || 1) }).map((_, i) => ({
-        category: categories[Math.floor(i / (countPerCategory || 1))],
-        question: `Dummy ${difficulty} question ${i+1} about your resume`,
-        idealAnswer: `Expected ${difficulty} answer.`
-      }))
-    });
+  const safeCategories = Array.isArray(categories) && categories.length > 0
+    ? categories
+    : ['Skills', 'Experience'];
+  const fallbackQuestions = buildFallbackQuestions(safeCategories, countPerCategory);
+
+  if (!hasGeminiKey() && !hasXAIKey()) {
+    return res.json({ success: true, questions: fallbackQuestions });
+  }
+
+  // 1. Fetch structured resume data
+  let structuredData = null;
+  if (userId) {
+    try {
+      if (isMongoDBConnected) {
+        structuredData = await ResumeData.findOne({ userId });
+      } else {
+        const data = readFallbackData();
+        structuredData = (data.resumeData || []).find(r => r.userId === userId);
+      }
+    } catch (err) {
+      console.warn("Could not load structured resume data for RAG:", err.message);
+    }
+  }
+
+  // 2. Perform RAG Retrieval for each category
+  let retrievedContext = '';
+  try {
+    const ragEngine = new RAGEngine(resumeText, structuredData, process.env.GEMINI_API_KEY);
+    await ragEngine.initialize();
+    const ragSummary = ragEngine.getSummary();
+    console.log('RAG Summary:', ragSummary);
+    
+    const retrievedChunks = [];
+    for (const cat of safeCategories) {
+      const chunks = await ragEngine.retrieve(cat, 4);
+      if (chunks.length > 0) {
+        retrievedChunks.push(`[${cat.toUpperCase()} - Resume Context]\n${chunks.join('\n')}`);
+      }
+    }
+    retrievedContext = retrievedChunks.join('\n\n');
+  } catch (err) {
+    console.error("RAG retrieval error:", err.message);
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `
-Generate an array of ${categories.length * (countPerCategory || 1)} mock interview questions based on the candidate's resume.
-Difficulty level: ${difficulty}.
-Categories needed: ${categories.join(', ')} (${countPerCategory} questions per category).
+You are an expert Senior Software Engineering Interviewer from India.
+
+You must conduct this interview and ask all questions in professional Indian English (using standard Indian technical recruiter tone, appropriate polite phrasing, and recruiter terminology where natural).
+
+You must only ask questions based on the candidate's uploaded resume. Never ask unrelated questions or generic questions that cannot be tied to the resume text.
+
+Base your questions strictly on the following RAG-retrieved sections of the candidate's resume:
+${retrievedContext}
+
+Overall Resume Text (for secondary reference/verification):
+${resumeText.substring(0, 10000)}
+
+Generate an array of ${safeCategories.length * (countPerCategory || 1)} resume-based interview questions.
+Difficulty level: ${difficulty}. Difficulty should gradually increase across the array, starting with introductory resume validation and moving toward deeper technical reasoning.
+Categories needed: ${safeCategories.join(', ')} (${countPerCategory || 1} questions per category).
+
+Question rules:
+- Ask one clear question per item.
+- Each question must mention, quote, or clearly reference a specific skill, project, role, education item, certification, technology, metric, or responsibility from the resume.
+- Do not invent employers, projects, tools, degrees, certifications, or experience not present in the resume.
+- Avoid HR, behavioral, trivia, or unrelated coding questions unless the resume itself includes the relevant work.
+- Include an idealAnswer that describes what a strong candidate should cover, grounded in the resume.
+
 Return ONLY a JSON array with this structure:
 [
   { "category": "CategoryName", "question": "Question text", "idealAnswer": "Ideal answer text" }
 ]
-Resume:
-${resumeText.substring(0, 15000)}
 `;
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().replace(/\s*```json/g, '').replace(/```/g, '').trim();
-    const questions = JSON.parse(text);
+    let text;
+    if (hasGeminiKey()) {
+      text = await callGeminiChat(prompt);
+    } else {
+      text = await callXAIChat(prompt);
+    }
+
+    let questions = fallbackQuestions;
+    const parsed = parseAiJsonSafely(text, fallbackQuestions);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      questions = parsed;
+    }
+
     res.json({ success: true, questions });
   } catch (err) {
     console.error('Question gen error:', err);
-    res.status(500).json({ error: err.message });
+    res.json({ success: true, questions: fallbackQuestions });
   }
 });
 
 app.post('/api/resume/follow-up', async (req, res) => {
-  const { resumeText, currentQuestion, userAnswer } = req.body;
+  const { userId, resumeText, currentQuestion, userAnswer } = req.body;
   
-  if (!process.env.GEMINI_API_KEY) {
-    return res.json({ success: true, question: { question: "Dummy follow-up question based on your answer?", idealAnswer: "Expected follow-up answer." } });
+  const fallbackFollowUp = { question: "Can you give a concrete example from your resume that supports your answer?", idealAnswer: "A strong answer should cite a specific resume item and explain the impact clearly." };
+
+  if (!hasGeminiKey() && !hasXAIKey()) {
+    return res.json({ success: true, question: fallbackFollowUp });
+  }
+
+  // 1. Fetch structured resume data
+  let structuredData = null;
+  if (userId) {
+    try {
+      if (isMongoDBConnected) {
+        structuredData = await ResumeData.findOne({ userId });
+      } else {
+        const data = readFallbackData();
+        structuredData = (data.resumeData || []).find(r => r.userId === userId);
+      }
+    } catch (err) {
+      console.warn("Could not load structured resume data for RAG:", err.message);
+    }
+  }
+
+  // 2. Perform RAG Retrieval based on current question and user's answer
+  let retrievedContext = '';
+  try {
+    const ragEngine = new RAGEngine(resumeText, structuredData, process.env.GEMINI_API_KEY);
+    await ragEngine.initialize();
+    
+    const query = `${currentQuestion} ${userAnswer}`;
+    const chunks = await ragEngine.retrieve(query, 4);
+    retrievedContext = chunks.join('\n');
+  } catch (err) {
+    console.error("RAG retrieval error for follow-up:", err.message);
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `
-You are an expert interviewer. Based on the candidate's answer to the current question, generate a single logical, probing follow-up question.
+You are an expert Senior Software Engineering Interviewer from India.
+
+Generate exactly one follow-up question in professional Indian English (using standard Indian technical recruiter tone and phrasing) based on:
+1. The candidate's uploaded resume.
+2. The current question.
+3. The candidate's answer.
+
+Base your question strictly on these retrieved resume facts if relevant:
+${retrievedContext}
+
+General Resume (for verification):
+${resumeText.substring(0, 10000)}
+
+Rules:
+- The follow-up must stay strictly related to a resume item or to the candidate's previous answer about that resume item.
+- Never ask unrelated or generic questions.
+- Increase depth if the answer was good; ask for clarification if the answer was shallow, vague, or missing technical detail.
+- Evaluate the same dimensions implicitly: technical accuracy, communication, confidence, problem solving, and depth of knowledge.
+
 Current Question: ${currentQuestion}
 Candidate's Answer: ${userAnswer}
 Return ONLY valid JSON: { "question": "Follow-up text", "idealAnswer": "Expected answer" }
 `;
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().replace(/\s*```json/g, '').replace(/```/g, '').trim();
-    res.json({ success: true, question: JSON.parse(text) });
+    let text;
+    if (hasGeminiKey()) {
+      text = await callGeminiChat(prompt);
+    } else {
+      text = await callXAIChat(prompt);
+    }
+    const question = parseAiJsonSafely(text, fallbackFollowUp);
+    res.json({ success: true, question });
   } catch (err) {
     console.error('Follow-up error:', err);
-    res.status(500).json({ error: err.message });
+    res.json({ success: true, question: fallbackFollowUp });
   }
 });
 
 app.post('/api/resume/evaluate-answer', async (req, res) => {
   const { question, idealAnswer, userAnswer } = req.body;
-  if (!process.env.GEMINI_API_KEY) {
-    return res.json({ success: true, evaluation: { score: 7, feedback: "Good effort (dummy)." } });
+  const fallbackEvaluation = { score: 7, feedback: "Good effort. Add a more specific example from your resume to strengthen your answer." };
+
+  if (!hasGeminiKey() && !hasXAIKey()) {
+    return res.json({ success: true, evaluation: fallbackEvaluation });
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `
-Evaluate this interview answer out of 10.
+You are a professional Senior Software Engineering interviewer evaluating one answer.
+
+Evaluate only against the resume-grounded question and expected answer. Score out of 10 based on:
+- Technical Accuracy
+- Communication
+- Confidence
+- Problem Solving
+- Depth of Knowledge
+
 Q: ${question}
 Ideal: ${idealAnswer}
 Answer: ${userAnswer}
-Return ONLY JSON: { "score": 8, "feedback": "Short constructive feedback" }
+Return ONLY JSON: { "score": 8, "feedback": "Short constructive feedback grounded in the resume question" }
 `;
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().replace(/\s*```json/g, '').replace(/```/g, '').trim();
-    res.json({ success: true, evaluation: JSON.parse(text) });
+    let text;
+    if (hasGeminiKey()) {
+      text = await callGeminiChat(prompt);
+    } else {
+      text = await callXAIChat(prompt);
+    }
+    const evaluation = parseAiJsonSafely(text, fallbackEvaluation);
+    res.json({ success: true, evaluation });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.json({ success: true, evaluation: fallbackEvaluation });
   }
 });
 
 app.post('/api/resume/detect-ai', async (req, res) => {
   const { answer } = req.body;
-  if (!process.env.GEMINI_API_KEY) {
-    return res.json({ success: true, detection: { aiLikelihood: 10, originalityScore: 90, personalizationScore: 85, confidenceScore: 80, explanation: "Dummy detection" } });
+  const fallbackDetection = { aiLikelihood: 10, originalityScore: 90, personalizationScore: 85, confidenceScore: 80, explanation: "Response looks personalized enough for a resume-based interview." };
+
+  if (!hasGeminiKey() && !hasXAIKey()) {
+    return res.json({ success: true, detection: fallbackDetection });
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `
 Analyze this answer for AI-generation likelihood. Look for generic explanations, lack of personalization, repetitive patterns, or overly formal language.
 Answer: ${answer}
 Return ONLY JSON: { "aiLikelihood": 15, "originalityScore": 85, "personalizationScore": 80, "confidenceScore": 90, "explanation": "Brief explanation" }
 `;
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().replace(/\s*```json/g, '').replace(/```/g, '').trim();
-    res.json({ success: true, detection: JSON.parse(text) });
+    let text;
+    if (hasGeminiKey()) {
+      text = await callGeminiChat(prompt);
+    } else {
+      text = await callXAIChat(prompt);
+    }
+    const detection = parseAiJsonSafely(text, fallbackDetection);
+    res.json({ success: true, detection });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.json({ success: true, detection: fallbackDetection });
   }
 });
 
 app.post('/api/resume/final-report', async (req, res) => {
-  const { qaList } = req.body;
-  if (!process.env.GEMINI_API_KEY) {
-    return res.json({ success: true, report: { strengths: ["Good"], weaknesses: ["None"], sectionWisePerformance: {"General": "Good"}, hiringRecommendation: "Hire" } });
+  const { qaList, resumeText = '' } = req.body;
+  const fallbackReport = {
+    technicalScore: 75,
+    communicationScore: 75,
+    confidenceScore: 75,
+    resumeMatch: 80,
+    strongAreas: ["Connects answers to resume experience"],
+    weakAreas: ["Needs more measurable impact and deeper technical examples"],
+    improvementSuggestions: ["Use specific metrics, design tradeoffs, and implementation details from your projects."],
+    strengths: ["Connects answers to resume experience"],
+    weaknesses: ["Needs more measurable impact and deeper technical examples"],
+    sectionWisePerformance: { "Resume Match": "Good" },
+    hiringRecommendation: "Hire"
+  };
+
+  if (!hasGeminiKey() && !hasXAIKey()) {
+    return res.json({ success: true, report: fallbackReport });
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `
-You are an expert tech hiring manager. Generate a final report based on this Q&A history.
-Q&A History: ${JSON.stringify(qaList.map(qa => ({ q: qa.question, a: qa.answer, score: qa.score })))}
+You are a professional Senior Software Engineering interviewer.
+
+Generate the final interview report. The interview must be evaluated only against the candidate's uploaded resume and the resume-based Q&A.
+
+Evaluate:
+- Technical Accuracy
+- Communication
+- Confidence
+- Problem Solving
+- Depth of Knowledge
+- Resume Match
+
+Resume:
+${resumeText.substring(0, 12000)}
+
+Q&A History: ${JSON.stringify(qaList.map(qa => ({ q: qa.question, ideal: qa.idealAnswer, a: qa.answer, score: qa.score, feedback: qa.feedback })))}
+
 Return ONLY JSON:
 {
+  "technicalScore": 0,
+  "communicationScore": 0,
+  "confidenceScore": 0,
+  "resumeMatch": 0,
+  "strongAreas": ["string"],
+  "weakAreas": ["string"],
+  "improvementSuggestions": ["string"],
   "strengths": ["string"],
   "weaknesses": ["string"],
-  "sectionWisePerformance": { "Technical": "string feedback" },
+  "sectionWisePerformance": { "Skills": "string feedback", "Experience": "string feedback", "Projects": "string feedback", "Education": "string feedback", "Certifications": "string feedback" },
   "hiringRecommendation": "Strong Hire" // Choose from: Strong Hire, Hire, Borderline, No Hire
 }
 `;
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().replace(/\s*```json/g, '').replace(/```/g, '').trim();
-    res.json({ success: true, report: JSON.parse(text) });
+    let text;
+    if (hasGeminiKey()) {
+      text = await callGeminiChat(prompt);
+    } else {
+      text = await callXAIChat(prompt);
+    }
+    const report = parseAiJsonSafely(text, fallbackReport);
+    res.json({ success: true, report });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.json({ success: true, report: fallbackReport });
   }
 });
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useUserProgress } from "../context/UserProgressContext";
+import { COIN_REWARDS, useUserProgress } from "../context/UserProgressContext";
 import { quizAPI, usersAPI } from "../services/api";
 import { toast } from "react-toastify";
 
@@ -16,7 +16,8 @@ export default function Home() {
     forgotPasswordUser,
     globalLeaderboard,
     fetchGlobalLeaderboard,
-    updateUserProfile
+    updateUserProfile,
+    claimDailyLoginReward
   } = useUserProgress();
 
   const navigate = useNavigate();
@@ -249,6 +250,29 @@ export default function Home() {
 
   const XP = totalScore > 0 ? totalScore : 1200;
   const LEVEL = Math.floor(XP / 200) + 1;
+  const coinBalance = progress.coins || 0;
+  const coinHistory = progress.coinHistory || [];
+  const nextRewardGoal = 1000;
+  const nextRewardProgress = Math.min(100, Math.round((coinBalance / nextRewardGoal) * 100));
+  const sortedLeaderboard = [...(globalLeaderboard || [])].sort((a, b) => (b.score || 0) - (a.score || 0));
+  const leaderboardRank = Math.max(1, sortedLeaderboard.findIndex(entry => entry.name === progress.username) + 1 || 8);
+  const rewardRows = Object.values(COIN_REWARDS);
+  const dailyChallenges = [
+    { title: 'Complete Daily Challenge', coins: COIN_REWARDS.DAILY_CHALLENGE.coins, progress: 65 },
+    { title: 'Solve Coding Challenge', coins: COIN_REWARDS.CODING_CHALLENGE.coins, progress: 35 },
+    { title: 'Maintain 95% Accuracy', coins: COIN_REWARDS.ACCURACY_STREAK.coins, progress: 80 }
+  ];
+  const achievements = [
+    { title: 'Perfect First Try', meta: '+50 coins', unlocked: coinHistory.some(h => h.source === 'FIRST_ATTEMPT_PERFECT') },
+    { title: 'Interview Pro', meta: '+100 coins', unlocked: coinHistory.some(h => h.source === 'AI_MOCK_INTERVIEW') },
+    { title: 'Clean Session', meta: '+30 coins', unlocked: coinHistory.some(h => h.source === 'NO_PROCTORING_VIOLATIONS') },
+    { title: 'Topic Master', meta: '+150 coins', unlocked: coinHistory.some(h => h.source === 'COMPLETE_TOPIC') }
+  ];
+  const redeemRewards = [
+    { title: 'Premium Hint Pack', cost: 250 },
+    { title: 'AI Feedback Boost', cost: 500 },
+    { title: 'Profile Badge', cost: 750 }
+  ];
 
   const handleReset = () => {
     if (window.confirm("Reset all progress?")) resetProgress();
@@ -361,26 +385,31 @@ export default function Home() {
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     const isComplete = done === total && total > 0;
     return (
-      <Link
-        to={`/playground/${category.slug}`}
-        className="hd-subcard"
-        style={{ '--acc': category.iconColor }}
-      >
-        <div className="hd-subcard-icon" style={{ background: category.color }}>
-          <span style={{ color: category.iconColor, fontWeight: 800, fontSize: '0.78rem' }}>
-            {category.label}
-          </span>
+      <Link to={`/playground/${category.slug}`} className="hd-subcard card-large-premium">
+        <div className="card-header-premium">
+          <div className="card-icon-premium" style={{ background: `${category.color}15`, border: `1px solid ${category.iconColor}30` }}>
+            <span style={{ color: category.iconColor, fontWeight: 800, fontSize: '0.85rem' }}>{category.label}</span>
+          </div>
+          <div className="card-badge-premium" style={{ background: isComplete ? '#ecfdf5' : done > 0 ? '#eff6ff' : '#f1f5f9', color: isComplete ? '#049669' : done > 0 ? '#1d4ed8' : '#475569' }}>
+            {done} / {total} Levels
+          </div>
         </div>
-        <div className="hd-subcard-body">
-          <div className="hd-subcard-name">
-            {category.name.replace(' Programming Quiz', '').replace(' Quiz', '')}
+
+        <div className="card-body-premium">
+          <div className="card-name-premium">{category.name.replace(' Programming Quiz', '').replace(' Quiz', '')}</div>
+          <div className="card-desc-premium">{category.description}</div>
+        </div>
+
+        <div className="card-footer-premium">
+          <div className="progress-section-premium">
+            <div className="progress-bar-wrap-premium">
+              <div className="progress-bar-fill-premium" style={{ width: `${pct}%`, background: category.iconColor }} />
+            </div>
+            <span className="progress-label-premium" style={{ color: category.iconColor }}>{pct}%</span>
           </div>
-          <div className="hd-subcard-bar-wrap">
-            <div className="hd-subcard-bar" style={{ width: `${pct}%`, background: category.iconColor }} />
-          </div>
-          <div className="hd-subcard-meta">
-            <span>{done}/{total} lvls</span>
-            <span style={{ color: isComplete ? '#16a34a' : '#64748b' }}>{pct}%</span>
+
+          <div className={`card-cta-premium ${isComplete ? 'complete' : done > 0 ? 'in-progress' : 'not-started'}`} style={{ '--brand-color': category.iconColor }}>
+            {isComplete ? 'Completed' : done > 0 ? 'Resume Play' : 'Start Practice'}
           </div>
         </div>
       </Link>
@@ -581,95 +610,180 @@ export default function Home() {
         <main className="hd-main">
 
         {activeNav === 'dashboard' && (
-          <div className="hd-dashboard-view">
-             {/* Welcome Card */}
-             <div className="hd-welcome-banner">
-                <div className="hd-welcome-text">
-                  <h1>Welcome back, {progress.username}! 👋</h1>
-                  <p>You're currently Level {LEVEL}. Keep learning to reach Level {LEVEL + 1}!</p>
+          <div className="rewards-dashboard">
+            <section className="rewards-hero rewards-glass">
+              <div className="rewards-hero-copy">
+                <span className="rewards-kicker">Coin & Rewards</span>
+                <h1>Welcome back, {progress.username}</h1>
+                <p>Earn coins from quizzes, interviews, streaks, challenges, and leaderboard wins.</p>
+                <div className="rewards-hero-actions">
+                  <button onClick={() => setActiveNav('all')} className="reward-primary-btn">Start Earning</button>
+                  <button onClick={() => navigate('/leaderboard')} className="reward-secondary-btn">View Rank</button>
                 </div>
-                <div className="hd-welcome-xp">
-                  <svg viewBox="0 0 36 36" className="circular-chart">
-                    <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    <path className="circle" strokeDasharray={`${Math.min(100, (XP % 200) / 2)}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  </svg>
-                  <div className="xp-text">{XP} XP</div>
+              </div>
+              <div className="coin-balance-card">
+                <div className="coin-orbit">
+                  <span className="coin-core">$</span>
                 </div>
-             </div>
+                <span className="coin-label">Coin Balance</span>
+                <strong>{coinBalance.toLocaleString()}</strong>
+                <small>Level {LEVEL} • {completedSections} quizzes passed</small>
+              </div>
+            </section>
 
-             {/* Stats Grid */}
-             <div className="hd-stats-overview">
-                <div className="hd-stat-box">
-                  <div className="stat-icon" style={{ background: 'var(--brand)', color: '#fff' }}>📚</div>
-                  <div className="stat-info">
-                    <div className="stat-val">{completedSections}</div>
-                    <div className="stat-lbl">Quizzes Passed</div>
+            <section className="rewards-grid">
+              <div className="reward-card daily-login-card">
+                <div className="reward-card-head">
+                  <div>
+                    <span>Daily Login</span>
+                    <h2>+{COIN_REWARDS.DAILY_LOGIN.coins} coins</h2>
                   </div>
+                  <div className="reward-medal">20</div>
                 </div>
-                <div className="hd-stat-box">
-                  <div className="stat-icon" style={{ background: 'var(--success)', color: '#fff' }}>⭐</div>
-                  <div className="stat-info">
-                    <div className="stat-val">{totalScore}</div>
-                    <div className="stat-lbl">Total Score</div>
-                  </div>
-                </div>
-                <div className="hd-stat-box">
-                  <div className="stat-icon" style={{ background: 'var(--warning)', color: '#fff' }}>🔥</div>
-                  <div className="stat-info">
-                    <div className="stat-val">3 Days</div>
-                    <div className="stat-lbl">Current Streak</div>
-                  </div>
-                </div>
-                <div className="hd-stat-box">
-                  <div className="stat-icon" style={{ background: '#ec4899', color: '#fff' }}>🏆</div>
-                  <div className="stat-info">
-                    <div className="stat-val">Level {LEVEL}</div>
-                    <div className="stat-lbl">Current Rank</div>
-                  </div>
-                </div>
-             </div>
+                <p>Claim once every day and keep your streak alive.</p>
+                <button onClick={claimDailyLoginReward} className="reward-primary-btn">Claim Daily Reward</button>
+              </div>
 
-             {/* Groups block */}
-             <section className="hd-categories-dashboard">
-               <GroupBlock
-                 title="Programming"
-                 subtitle="Core programming language quizzes"
-                 headerGrad="linear-gradient(135deg,#1e1b4b,#312e81,#4338ca)"
-                 borderCol="#c7d2fe"
-                 subBg="linear-gradient(135deg,#eef2ff,#f5f3ff)"
-                 subBorder="#e0e7ff"
-                 expanded={programmingExpanded}
-                 setExpanded={setProgrammingExpanded}
-                 stats={prog}
-                 cats={programmingCategories}
-               />
-               <GroupBlock
-                 title="Frontend"
-                 subtitle="HTML, CSS & React"
-                 headerGrad="linear-gradient(135deg,#0f3d38,#0d766b,#0f9689)"
-                 borderCol="#99f6e4"
-                 subBg="linear-gradient(135deg,#f0fdfa,#ecfdf5)"
-                 subBorder="#ccfbf1"
-                 expanded={frontendExpanded}
-                 setExpanded={setFrontendExpanded}
-                 stats={fe}
-                 cats={frontendCategories}
-               />
-               <GroupBlock
-                 title="Backend"
-                 subtitle="Node.js & Algorithms"
-                 headerGrad="linear-gradient(135deg,#431407,#9a3412,#c2410c)"
-                 borderCol="#fed7aa"
-                 subBg="linear-gradient(135deg,#fff7ed,#fffbeb)"
-                 subBorder="#fed7aa"
-                 expanded={backendExpanded}
-                 setExpanded={setBackendExpanded}
-                 stats={be}
-                 cats={backendCategories}
-               />
-             </section>
+              <div className="reward-card streak-card">
+                <div className="reward-card-head">
+                  <div>
+                    <span>Streak Rewards</span>
+                    <h2>{progress.streakDays || 1} day streak</h2>
+                  </div>
+                  <div className="streak-flame"></div>
+                </div>
+                <div className="streak-track">
+                  <div style={{ width: `${Math.min(100, ((progress.streakDays || 1) / 7) * 100)}%` }}></div>
+                </div>
+                <p>7 days unlocks +100 coins. 30 days unlocks +500 coins.</p>
+              </div>
+
+              <div className="reward-card rank-card">
+                <span>Leaderboard Rank</span>
+                <h2>#{leaderboardRank}</h2>
+                <p>{totalScore} score points across your learning quests.</p>
+                <button onClick={() => navigate('/leaderboard')} className="reward-secondary-btn">Open Leaderboard</button>
+              </div>
+
+              <div className="reward-card wheel-card">
+                <div className="spin-wheel">
+                  <span>+20</span><span>+75</span><span>+5</span><span>+100</span>
+                </div>
+                <div>
+                  <span>Spin-the-Wheel Bonus</span>
+                  <h2>Daily bonus spin</h2>
+                  <p>Try for surprise coin boosts after a challenge.</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="reward-main-layout">
+              <div className="reward-panel daily-challenges">
+                <div className="reward-section-title">
+                  <div>
+                    <span>Today</span>
+                    <h2>Daily Challenges</h2>
+                  </div>
+                  <button onClick={() => setActiveNav('all')} className="reward-icon-btn">→</button>
+                </div>
+                {dailyChallenges.map(challenge => (
+                  <div className="challenge-row" key={challenge.title}>
+                    <div>
+                      <strong>{challenge.title}</strong>
+                      <span>+{challenge.coins} coins</span>
+                    </div>
+                    <div className="mini-progress"><div style={{ width: `${challenge.progress}%` }}></div></div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="reward-panel progress-reward">
+                <div className="reward-section-title">
+                  <div>
+                    <span>Next Reward</span>
+                    <h2>Gold Badge Pack</h2>
+                  </div>
+                  <strong>{nextRewardProgress}%</strong>
+                </div>
+                <div className="reward-progress-bar"><div style={{ width: `${nextRewardProgress}%` }}></div></div>
+                <p>{Math.max(0, nextRewardGoal - coinBalance).toLocaleString()} coins left to unlock your next reward.</p>
+              </div>
+
+              <div className="reward-panel achievements-panel">
+                <div className="reward-section-title">
+                  <div>
+                    <span>Milestones</span>
+                    <h2>Achievements</h2>
+                  </div>
+                </div>
+                <div className="achievement-grid">
+                  {achievements.map(item => (
+                    <div className={`achievement-tile ${item.unlocked ? 'unlocked' : ''}`} key={item.title}>
+                      <span>{item.unlocked ? '✓' : '•'}</span>
+                      <strong>{item.title}</strong>
+                      <small>{item.meta}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="reward-panel redeem-panel">
+                <div className="reward-section-title">
+                  <div>
+                    <span>Store</span>
+                    <h2>Redeem Rewards</h2>
+                  </div>
+                </div>
+                {redeemRewards.map(reward => (
+                  <div className="redeem-row" key={reward.title}>
+                    <div>
+                      <strong>{reward.title}</strong>
+                      <span>{reward.cost} coins</span>
+                    </div>
+                    <button disabled={coinBalance < reward.cost}>{coinBalance >= reward.cost ? 'Redeem' : 'Locked'}</button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="reward-panel reward-table-panel">
+                <div className="reward-section-title">
+                  <div>
+                    <span>Coin Rules</span>
+                    <h2>How Coins Are Earned</h2>
+                  </div>
+                </div>
+                <div className="coin-rules-table">
+                  {rewardRows.map(row => (
+                    <div className="coin-rule-row" key={row.label}>
+                      <span>{row.label}</span>
+                      <strong>+{row.coins}{row.suffix ? ` ${row.suffix}` : ''}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="reward-panel history-panel">
+                <div className="reward-section-title">
+                  <div>
+                    <span>Ledger</span>
+                    <h2>Recent Coin History</h2>
+                  </div>
+                </div>
+                {(coinHistory.length ? coinHistory.slice(0, 6) : [
+                  { id: 'empty-1', activity: 'Complete a quiz to start earning', coins: 0, date: 'No activity yet' }
+                ]).map(item => (
+                  <div className="history-row" key={item.id}>
+                    <div>
+                      <strong>{item.activity}</strong>
+                      <span>{item.date}</span>
+                    </div>
+                    <b>{item.coins > 0 ? `+${item.coins}` : '0'}</b>
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
-        )}
+         )}
 
         {activeNav === 'profile' && (
           <div className="hd-profile-view">

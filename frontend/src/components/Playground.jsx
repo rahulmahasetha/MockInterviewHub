@@ -1,23 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import LevelMarker from './LevelMarker';
+// LevelMarker removed — using clean quiz layout
 import MCQCard from './MCQCard';
 import { useUserProgress } from '../context/UserProgressContext';
 import { quizAPI } from '../services/api';
+import {
+  FaBell,
+  FaCheckCircle,
+  FaDesktop,
+  FaExclamationTriangle,
+  FaExpand,
+  FaEye,
+  FaMicrophone,
+  FaVideo,
+  FaWifi
+} from 'react-icons/fa';
 
-import scienceMap from '../assets/maps/scienceMap.png';
-
-const defaultMap = scienceMap;
+// map removed
 
 export default function Playground() {
   const { category } = useParams();
   const navigate = useNavigate();
+  const videoRef = useRef(null);
   const [selectedLevel, setSelectedLevel] = useState(null);
   const { getCategoryProgress } = useUserProgress();
   const [data, setData] = useState({ levels: [] });
   const [categoryData, setCategoryData] = useState(null);
   const [isLoadingCategory, setIsLoadingCategory] = useState(true);
   const [showProgressOverview, setShowProgressOverview] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [micReady, setMicReady] = useState(false);
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [proctorError, setProctorError] = useState('');
+  const [tabSwitches, setTabSwitches] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
     async function loadCategory() {
@@ -39,9 +56,110 @@ export default function Playground() {
     loadCategory();
   }, [category]);
 
+  useEffect(() => {
+    let stream;
+    let cancelled = false;
+
+    async function setupProctoringStream() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setProctorError('Camera access is not supported by this browser.');
+        return;
+      }
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        if (cancelled) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+
+        setCameraReady(stream.getVideoTracks().some(track => track.readyState === 'live'));
+        setMicReady(stream.getAudioTracks().some(track => track.readyState === 'live'));
+        setProctorError('');
+      } catch (error) {
+        setCameraReady(false);
+        setMicReady(false);
+        setProctorError('Allow camera and microphone access to enable live proctoring.');
+      }
+    }
+
+    setupProctoringStream();
+
+    return () => {
+      cancelled = true;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setTabSwitches(count => count + 1);
+      }
+    };
+
+    const handleFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!cameraReady) {
+      setFaceDetected(false);
+      return undefined;
+    }
+
+    if (!('FaceDetector' in window)) {
+      setFaceDetected(true);
+      return undefined;
+    }
+
+    const detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+    const interval = window.setInterval(async () => {
+      if (!videoRef.current || videoRef.current.readyState < 2) return;
+
+      try {
+        const faces = await detector.detect(videoRef.current);
+        setFaceDetected(faces.length > 0);
+      } catch (error) {
+        setFaceDetected(true);
+      }
+    }, 1600);
+
+    return () => window.clearInterval(interval);
+  }, [cameraReady]);
+
   function onLevelClick(level) {
     setSelectedLevel(level);
   }
+
+  const requestFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (error) {
+      setProctorError('Fullscreen permission was blocked. Continue only after enabling it.');
+    }
+  };
 
   const categoryProgress = getCategoryProgress(category);
   const passed = new Set(categoryProgress?.passed || []);
@@ -52,19 +170,10 @@ export default function Playground() {
   const categoryTitle = categoryData?.name || (category ? category.charAt(0).toUpperCase() + category.slice(1) : 'Quest');
   const categoryColor = categoryData?.iconColor || '#2563eb';
   const categoryLabel = categoryData?.label || 'QZ';
+  const warningCount = Number(!cameraReady) + Number(!micReady) + Number(!isFullscreen) + Number(!isOnline) + tabSwitches;
+  const proctorStatus = warningCount === 0 ? 'Secure' : warningCount <= 2 ? 'Watch' : 'Review';
 
-  const positions = [
-    { left: '8%', top: '20%' },
-    { left: '22%', top: '12%' },
-    { left: '38%', top: '34%' },
-    { left: '54%', top: '18%' },
-    { left: '70%', top: '28%' },
-    { left: '82%', top: '46%' },
-    { left: '60%', top: '58%' },
-    { left: '40%', top: '70%' },
-    { left: '20%', top: '60%' },
-    { left: '10%', top: '44%' }
-  ];
+  // map positions removed
 
   return (
     <div className="playground-container app-shell">
@@ -87,6 +196,24 @@ export default function Playground() {
             </button>
             <div className="score-badge">{currentScore} Points</div>
           </nav>
+        </div>
+
+        <div className="proctor-topbar" aria-label="Proctoring status">
+          <div className="proctor-session">
+            <span className={`proctor-live-dot ${proctorStatus.toLowerCase()}`}></span>
+            <div>
+              <strong>AI Proctoring</strong>
+              <span>{proctorStatus} session monitoring</span>
+            </div>
+          </div>
+
+          <div className="proctor-topbar-items">
+            <span className={`proctor-pill ${cameraReady ? 'ok' : 'alert'}`}><FaVideo /> Camera</span>
+            <span className={`proctor-pill ${micReady ? 'ok' : 'alert'}`}><FaMicrophone /> Mic</span>
+            <span className={`proctor-pill ${faceDetected ? 'ok' : 'alert'}`}><FaEye /> Face</span>
+            <span className={`proctor-pill ${isFullscreen ? 'ok' : 'warn'}`}><FaExpand /> Fullscreen</span>
+            <span className={`proctor-pill ${isOnline ? 'ok' : 'alert'}`}><FaWifi /> Online</span>
+          </div>
         </div>
       </header>
 
@@ -170,93 +297,150 @@ export default function Playground() {
 
       <main className="playground-main">
         <div className="layout-grid">
-          <section className="map-section">
-            <div className="map-container">
-              <div className="map-header">
-                <h2>Quest Map</h2>
-                <div className="quest-badge">{passedCount}/{totalLevels} Completed</div>
+          <section className="quiz-section">
+            <div className="quiz-container">
+              <div className="quiz-header">
+                <div className="quiz-progress">
+                  <div className="qp-top">
+                    <span>Question {selectedLevel ? selectedLevel.level : 1} of {totalLevels}</span>
+                    <span className="qp-timer">{/* timer could go here */}</span>
+                  </div>
+                  <div className="progress-bar">
+                    <div className="progress-fill" style={{ width: `${Math.round(progressPercentage)}%`, background: categoryColor }} />
+                  </div>
+                </div>
+                <h2 className="quiz-title">{categoryTitle} Challenge</h2>
               </div>
 
-              <div className="map-wrapper">
-                <img className="map-image" src={defaultMap} alt={`${categoryTitle} quest map`} />
+              <div className="quiz-body">
+                <div className="quiz-card">
+                  {isLoadingCategory && <div className="map-loading">Loading quiz...</div>}
+                  {!isLoadingCategory && (
+                    <>
+                      {!selectedLevel && data.levels.length > 0 && (
+                        <button className="start-quiz-btn" onClick={() => setSelectedLevel(data.levels[0])}>Start Quiz</button>
+                      )}
 
-                {isLoadingCategory && <div className="map-loading">Loading quiz from MongoDB...</div>}
-                {!isLoadingCategory && data.levels.map((lvl, idx) => {
-                  const pos = positions[idx] || { left: `${6 + idx * 8}%`, top: '40%' };
-                  const levelNumber = idx + 1;
-                  const isCompleted = passed.has(levelNumber - 1);
-                  const previousLevelCompleted = levelNumber === 1 || passed.has(levelNumber - 1);
-                  const isLocked = !previousLevelCompleted && !isCompleted;
-
-                  let currentLevelIndex = -1;
-                  for (let i = 0; i < totalLevels; i++) {
-                    if (!passed.has(i + 1)) {
-                      currentLevelIndex = i;
-                      break;
-                    }
-                  }
-
-                  const isCurrent = currentLevelIndex === -1
-                    ? levelNumber === totalLevels
-                    : levelNumber === currentLevelIndex + 1;
-
-                  return (
-                    <LevelMarker
-                      key={idx}
-                      style={{ left: pos.left, top: pos.top }}
-                      level={levelNumber}
-                      locked={isLocked}
-                      completed={isCompleted}
-                      current={isCurrent}
-                      category={category}
-                      onClick={() => !isLocked && onLevelClick(lvl)}
-                    />
-                  );
-                })}
-              </div>
-
-              <div className="map-legend">
-                <div className="legend-item"><div className="legend-color current"></div><span>Current</span></div>
-                <div className="legend-item"><div className="legend-color completed"></div><span>Completed</span></div>
-                <div className="legend-item"><div className="legend-color locked"></div><span>Locked</span></div>
+                      {selectedLevel && (
+                        <MCQCard
+                          levelObj={selectedLevel}
+                          category={category}
+                          totalLevels={totalLevels}
+                          onCorrectNextLevel={(nextLevel) => {
+                            const next = data.levels.find(l => l.level === nextLevel);
+                            if (next) setSelectedLevel(next);
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </section>
 
-          <aside className="sidebar">
-            <div className="question-section">
-              {selectedLevel ? (
-                <div className="mcq-container">
-                  <div className="mcq-header">
-                    <h3>Level {selectedLevel.level} Challenge</h3>
-                    <button onClick={() => setSelectedLevel(null)} className="stop-mcq-button" title="Stop Current Level">
-                      Stop
-                    </button>
-                  </div>
-                  <MCQCard
-                    levelObj={selectedLevel}
-                    category={category}
-                    totalLevels={totalLevels}
-                    setSelectedLevel={setSelectedLevel}
-                    onCorrectNextLevel={(nextLevel) => {
-                      const next = data.levels.find(l => l.level === nextLevel);
-                      if (next) setSelectedLevel(next);
-                    }}
-                  />
+          <aside className="sidebar quiz-sidebar">
+            <section className="proctor-card" aria-label="Live AI proctoring panel">
+              <div className="proctor-card-header">
+                <div>
+                  <h4>Proctor Monitor</h4>
+                  <span>Live environment checks</span>
                 </div>
-              ) : (
-                <div className="welcome-card">
-                  <div className="welcome-icon">Start</div>
-                  <h3>Ready to Begin?</h3>
-                  <p>Select an unlocked level on the map to start your {category} challenge.</p>
+                <span className={`proctor-risk ${proctorStatus.toLowerCase()}`}>{proctorStatus}</span>
+              </div>
 
-                  <div className="tips">
-                    <div className="tip">Complete levels in order to unlock new challenges.</div>
-                    <div className="tip">Earn points for correct answers the first time.</div>
-                    <div className="tip">Replay completed levels anytime.</div>
+              <div className="webcam-preview">
+                <video ref={videoRef} autoPlay muted playsInline />
+                {!cameraReady && (
+                  <div className="webcam-placeholder">
+                    <FaVideo />
+                    <span>Camera permission needed</span>
                   </div>
+                )}
+                <div className="face-frame">
+                  <span>{faceDetected ? 'Face detected' : 'No face signal'}</span>
                 </div>
+              </div>
+
+              <div className="proctor-check-grid">
+                <div className={`proctor-check ${micReady ? 'ok' : 'alert'}`}>
+                  <FaMicrophone />
+                  <div><strong>Microphone</strong><span>{micReady ? 'Active input' : 'Permission needed'}</span></div>
+                </div>
+                <div className={`proctor-check ${faceDetected ? 'ok' : 'alert'}`}>
+                  <FaEye />
+                  <div><strong>Face Detection</strong><span>{faceDetected ? 'Single face visible' : 'Waiting for camera'}</span></div>
+                </div>
+                <div className={`proctor-check ${tabSwitches === 0 ? 'ok' : 'warn'}`}>
+                  <FaDesktop />
+                  <div><strong>Tab Switches</strong><span>{tabSwitches} detected</span></div>
+                </div>
+                <div className={`proctor-check ${isFullscreen ? 'ok' : 'warn'}`}>
+                  <FaExpand />
+                  <div><strong>Fullscreen</strong><span>{isFullscreen ? 'Enabled' : 'Not enabled'}</span></div>
+                </div>
+                <div className={`proctor-check ${isOnline ? 'ok' : 'alert'}`}>
+                  <FaWifi />
+                  <div><strong>Internet</strong><span>{isOnline ? 'Stable connection' : 'Offline'}</span></div>
+                </div>
+              </div>
+
+              {!isFullscreen && (
+                <button type="button" className="fullscreen-action" onClick={requestFullscreen}>
+                  <FaExpand /> Enter Fullscreen
+                </button>
               )}
+
+              <div className="warning-panel">
+                <div className="warning-panel-title">
+                  <FaBell />
+                  <strong>Warnings</strong>
+                  <span>{warningCount}</span>
+                </div>
+                <div className="warning-list">
+                  {proctorError && <p className="warning-item danger"><FaExclamationTriangle /> {proctorError}</p>}
+                  {!isFullscreen && <p className="warning-item"><FaExclamationTriangle /> Fullscreen monitoring is not active.</p>}
+                  {tabSwitches > 0 && <p className="warning-item"><FaExclamationTriangle /> Tab switching was detected {tabSwitches} time{tabSwitches > 1 ? 's' : ''}.</p>}
+                  {isOnline && cameraReady && micReady && isFullscreen && tabSwitches === 0 && (
+                    <p className="warning-item success"><FaCheckCircle /> No warnings. Keep the quiz window focused.</p>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <div className="sidebar-top">
+              <h4>Your Progress</h4>
+              <div className="progress-circle">
+                <div className="progress-number">{Math.round(progressPercentage)}%</div>
+              </div>
+              <div className="progress-stats">
+                <div><strong>{passedCount}</strong><span>Correct</span></div>
+                <div><strong>{totalLevels - passedCount}</strong><span>Remaining</span></div>
+              </div>
+            </div>
+
+            <div className="navigator">
+              <h5>Question Navigator</h5>
+              <div className="nav-grid">
+                {data.levels.map((lvl, idx) => {
+                  const levelNumber = idx + 1;
+                  const isCompleted = passed.has(levelNumber - 1);
+                  const isCurrent = selectedLevel?.level === levelNumber;
+                  const previousLevelCompleted = levelNumber === 1 || passed.has(levelNumber - 2);
+                  const isLocked = !previousLevelCompleted && !isCompleted;
+
+                  return (
+                    <button
+                      key={idx}
+                      className={`nav-cell ${isCompleted ? 'answered' : isCurrent ? 'current' : isLocked ? 'locked' : 'unanswered'}`}
+                      onClick={() => !isLocked && setSelectedLevel(data.levels[idx])}
+                      disabled={isLocked}
+                    >
+                      {levelNumber}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </aside>
         </div>

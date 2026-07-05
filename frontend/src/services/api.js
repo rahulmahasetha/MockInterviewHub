@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = 'http://127.0.0.1:3001';
+const API_BASE = process.env.REACT_APP_API_URL || 'http://127.0.0.1:3001';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -57,7 +57,12 @@ export const usersAPI = {
 
 // AI Resume Interview Operations
 export const resumeAPI = {
-  uploadResume: (data) => api.post('/api/resume/upload', data),
+  uploadResume: (data) => {
+    const config = data instanceof FormData
+      ? { headers: { 'Content-Type': undefined } }
+      : {};
+    return api.post('/api/resume/upload', data, config);
+  },
   getResumeData: (userId) => api.get(`/api/resume/${userId}`),
   generateQuestions: (data) => api.post('/api/resume/generate-questions', data),
   generateFollowUp: (data) => api.post('/api/resume/follow-up', data),

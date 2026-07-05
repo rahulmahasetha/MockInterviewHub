@@ -42,7 +42,10 @@ export default function MCQCard({ levelObj, category, onCorrectNextLevel, totalL
       setResult('alreadyCompleted');
     } else {
       setResult('correct');
-      markPassed(category, levelObj.level);
+      markPassed(category, levelObj.level, {
+        totalLevels,
+        finishedUnderTime: timeLeft > 0
+      });
     }
 
     const isLastLevel = levelObj.level >= totalLevels;
@@ -93,23 +96,18 @@ export default function MCQCard({ levelObj, category, onCorrectNextLevel, totalL
         Level {levelObj.level}: {levelObj.question}
       </h3>
 
-      <div className="mcq-options">
+      <div className="mcq-options pill-options">
         {levelObj.options.map((opt, index) => (
-          <label
+          <button
             key={index}
-            className={`mcq-option ${selected === opt ? 'selected' : ''} ${result !== null ? 'disabled' : ''}`}
+            type="button"
+            onClick={() => !result && setSelected(opt)}
+            className={`pill-option ${selected === opt ? 'pill-selected' : ''} ${result !== null ? 'pill-disabled' : ''}`}
+            aria-pressed={selected === opt}
           >
-            <input
-              type="radio"
-              name="answer"
-              value={opt}
-              checked={selected === opt}
-              onChange={() => setSelected(opt)}
-              disabled={result !== null}
-              className="mcq-radio"
-            />
-            {opt}
-          </label>
+            <span className="pill-label">{String.fromCharCode(97 + index)}.</span>
+            <span className="pill-text">{opt}</span>
+          </button>
         ))}
       </div>
 
@@ -134,13 +132,13 @@ export default function MCQCard({ levelObj, category, onCorrectNextLevel, totalL
 
       {result === 'correct' && (
         <div className="mcq-result success">
-          Correct. +20 points. {levelObj.level < totalLevels ? 'Moving to next level...' : 'Category completed.'}
+          Correct. Coins earned. {levelObj.level < totalLevels ? 'Moving to next level...' : 'Category completed.'}
         </div>
       )}
 
       {result === 'alreadyCompleted' && (
         <div className="mcq-result neutral">
-          Correct. Already completed - no additional points.
+          Correct. Already completed - no additional coins.
           {levelObj.level < totalLevels && ' Moving to next level...'}
         </div>
       )}
