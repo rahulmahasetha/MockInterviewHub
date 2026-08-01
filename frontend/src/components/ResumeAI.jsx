@@ -127,6 +127,7 @@ export default function ResumeAI() {
 
   const recognitionRef = useRef(null);
   const synthRef = useRef(window.speechSynthesis);
+  const evalPromises = useRef([]);
 
   const availableCategories = ['Skills', 'Experience', 'Projects', 'Education', 'Certifications'];
   const interviewerIntro = 'Hello! I am your AI interviewer today. I have thoroughly analyzed your resume and will be asking you focused questions based on your actual experience, skills, and projects. Please answer clearly and confidently. Let us begin.';
@@ -296,7 +297,10 @@ export default function ResumeAI() {
       if (res.data.success && res.data.questions.length > 0) {
         setQuestionQueue(res.data.questions);
         speakText(`${interviewerIntro} Here is your first question: ${res.data.questions[0].question}`, () => {
-          if (recognitionRef.current && !isRecording) { recognitionRef.current.start(); setIsRecording(true); }
+          if (recognitionRef.current) {
+            try { recognitionRef.current.start(); } catch (e) { /* already started */ }
+            setIsRecording(true);
+          }
         });
       }
     } catch (err) {
@@ -315,27 +319,62 @@ export default function ResumeAI() {
     setCurrentAnswer('');
 
     const evalIndex = currentQuestionIndex;
-    resumeAPI.evaluateAnswer({ question: currentQ.question, idealAnswer: currentQ.idealAnswer, userAnswer: ans })
-      .then(r => { if (r.data.success) setEvaluations(prev => { const n = [...prev]; if (!n[evalIndex]) n[evalIndex] = {}; n[evalIndex].score = r.data.evaluation.score; n[evalIndex].feedback = r.data.evaluation.feedback; return n; }); })
-      .catch(() => {});
-    resumeAPI.detectAI({ answer: ans })
-      .then(r => { if (r.data.success) setEvaluations(prev => { const n = [...prev]; if (!n[evalIndex]) n[evalIndex] = {}; n[evalIndex].aiLikelihood = r.data.detection.aiLikelihood; return n; }); })
-      .catch(() => {});
+    
+    // Background evaluation & AI detection
+    const evalPromise = Promise.all([
+      resumeAPI.evaluateAnswer({ question: currentQ.question, idealAnswer: currentQ.idealAnswer, userAnswer: ans }),
+      resumeAPI.detectAI({ answer: ans })
+    ]).then(([rEval, rAi]) => {
+      setEvaluations(prev => { 
+        const n = [...prev]; 
+        if (!n[evalIndex]) n[evalIndex] = {}; 
+        if (rEval.data.success) {
+          n[evalIndex].score = rEval.data.evaluation.score; 
+          n[evalIndex].feedback = rEval.data.evaluation.feedback; 
+        }
+        if (rAi.data.success) {
+          n[evalIndex].aiLikelihood = rAi.data.detection.aiLikelihood;
+        }
+        return n; 
+      });
+      return { 
+        score: rEval.data?.evaluation?.score || 0, 
+        feedback: rEval.data?.evaluation?.feedback || '',
+        aiLikelihood: rAi.data?.detection?.aiLikelihood || 0
+      };
+    }).catch(() => { return { score: 0, feedback: '', aiLikelihood: 0 }; });
+    
+    evalPromises.current.push(evalPromise);
 
-    setIsGeneratingNext(true);
-    let nextQueue = [...questionQueue];
-    try {
-      if (ans.length > 30) {
-        const fu = await resumeAPI.generateFollowUp({ userId: progress.userId, resumeText: resumeData.rawText, currentQuestion: currentQ.question, userAnswer: ans });
-        if (fu.data.success) { nextQueue.splice(currentQuestionIndex + 1, 0, { ...fu.data.question, category: 'Follow-up' }); setQuestionQueue(nextQueue); }
-      }
-    } catch (e) { /* ignore */ } finally {
-      setIsGeneratingNext(false);
-      const next = currentQuestionIndex + 1;
-      if (next < nextQueue.length) {
-        setCurrentQuestionIndex(next);
-        speakText(nextQueue[next].question, () => { if (recognitionRef.current) { recognitionRef.current.start(); setIsRecording(true); } });
-      } else { finishInterview(false); }
+    // Background follow-up generation (don't block the next question)
+    if (ans.length > 30) {
+      resumeAPI.generateFollowUp({ userId: progress.userId, resumeText: resumeData.rawText, currentQuestion: currentQ.question, userAnswer: ans })
+        .then(fu => {
+          if (fu.data.success) {
+            setQuestionQueue(prev => {
+              const nextQueue = [...prev];
+              // Insert after the NEXT question so it doesn't disrupt the immediate flow
+              const insertIdx = currentQuestionIndex + 2; 
+              nextQueue.splice(insertIdx, 0, { ...fu.data.question, category: 'Follow-up' });
+              return nextQueue;
+            });
+          }
+        }).catch(() => {});
+    }
+
+    // Immediately trigger next question
+    const next = currentQuestionIndex + 1;
+    // We check against the current length. If follow up is added, it will be handled when index reaches there.
+    if (next < questionQueue.length) {
+      setCurrentQuestionIndex(next);
+      speakText(questionQueue[next].question, () => {
+        if (recognitionRef.current) {
+          try { recognitionRef.current.start(); } catch (e) { /* already started */ }
+          setIsRecording(true);
+        }
+      });
+    } else {
+      finishInterview(false);
     }
   };
 
@@ -344,14 +383,42 @@ export default function ResumeAI() {
     stopSpeaking();
     setPhase('report');
     setIsGeneratingReport(true);
+    
     const finalAnswers = [...userAnswers];
-    if (currentAnswer && !autoSubmitted) finalAnswers[currentQuestionIndex] = currentAnswer;
-    await new Promise(r => setTimeout(r, 2000));
-    const qaList = questionQueue.map((q, i) => ({
-      question: q.question, idealAnswer: q.idealAnswer,
-      answer: finalAnswers[i] || '', score: evaluations[i]?.score || 0,
-      feedback: evaluations[i]?.feedback || '', aiLikelihood: evaluations[i]?.aiLikelihood || 0
-    }));
+    if (currentAnswer && !autoSubmitted) {
+      finalAnswers[currentQuestionIndex] = currentAnswer;
+      // If the user submits on the final question, we need to manually trigger evaluation since handleNextQuestion wasn't fully processed
+      if (currentQuestionIndex === questionQueue.length - 1) {
+        const currentQ = questionQueue[currentQuestionIndex];
+        const evalPromise = Promise.all([
+          resumeAPI.evaluateAnswer({ question: currentQ.question, idealAnswer: currentQ.idealAnswer, userAnswer: currentAnswer }),
+          resumeAPI.detectAI({ answer: currentAnswer })
+        ]).then(([rEval, rAi]) => {
+           return { 
+            score: rEval.data?.evaluation?.score || 0, 
+            feedback: rEval.data?.evaluation?.feedback || '',
+            aiLikelihood: rAi.data?.detection?.aiLikelihood || 0
+          };
+        }).catch(() => { return { score: 0, feedback: '', aiLikelihood: 0 }; });
+        evalPromises.current.push(evalPromise);
+      }
+    }
+    
+    // Wait for all evaluations to complete to ensure accurate history
+    const finalEvals = await Promise.all(evalPromises.current);
+    
+    const qaList = questionQueue.map((q, i) => {
+      // Use the resolved evaluation from the Promise if available, fallback to state
+      const finalEval = finalEvals[i] || evaluations[i] || {};
+      return {
+        question: q.question, idealAnswer: q.idealAnswer,
+        answer: finalAnswers[i] || '', 
+        score: finalEval.score || 0,
+        feedback: finalEval.feedback || '', 
+        aiLikelihood: finalEval.aiLikelihood || 0
+      };
+    });
+    
     try {
       const res = await resumeAPI.generateReport({ qaList, resumeText: resumeData?.rawText || '' });
       if (res.data.success) {

@@ -8,6 +8,8 @@ import ScoreSummary from './components/ScoreSummary';
 import Leaderboard from './components/Leaderboard';
 import MockInterview from './components/MockInterview';
 import ResumeAI from './components/ResumeAI';
+import AdminPanel from './components/AdminPanel';
+import ResumeBuilder from './components/ResumeBuilder';
 import { UserProgressProvider } from './context/UserProgressContext';
 
 export default function App() {
@@ -31,6 +33,8 @@ export default function App() {
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/interview" element={<MockInterview />} />
         <Route path="/resume-interview" element={<ResumeAI />} />
+        <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/resume-builder" element={<ResumeBuilder />} />
       </Routes>
     </UserProgressProvider>
   );

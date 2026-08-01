@@ -133,10 +133,29 @@ const formatScoreTimestamp = () => new Date().toLocaleString(undefined, {
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\$&');
 
-const cleanAIJsonText = (text) => String(text || '')
-  .replace(/\s*```json/g, '')
-  .replace(/```/g, '')
-  .trim();
+const cleanAIJsonText = (text) => {
+  let cleaned = String(text || '').replace(/\s*```json/g, '').replace(/```/g, '').trim();
+  const startObj = cleaned.indexOf('{');
+  const startArr = cleaned.indexOf('[');
+  
+  let start = -1;
+  if (startObj !== -1 && startArr !== -1) start = Math.min(startObj, startArr);
+  else if (startObj !== -1) start = startObj;
+  else if (startArr !== -1) start = startArr;
+
+  const endObj = cleaned.lastIndexOf('}');
+  const endArr = cleaned.lastIndexOf(']');
+  
+  let end = -1;
+  if (endObj !== -1 && endArr !== -1) end = Math.max(endObj, endArr);
+  else if (endObj !== -1) end = endObj;
+  else if (endArr !== -1) end = endArr;
+
+  if (start !== -1 && end !== -1 && end >= start) {
+    cleaned = cleaned.substring(start, end + 1);
+  }
+  return cleaned;
+};
 
 const parseAiJsonSafely = (text, fallback) => {
   try {
@@ -144,6 +163,7 @@ const parseAiJsonSafely = (text, fallback) => {
     const parsed = JSON.parse(cleaned);
     return parsed && typeof parsed === 'object' ? parsed : fallback;
   } catch (err) {
+    console.warn("AI JSON parse warning, falling back:", err.message);
     return fallback;
   }
 };
@@ -152,9 +172,20 @@ const { parseResumeFallback } = require('./utils/resumeParser');
 const { RAGEngine } = require('./utils/ragEngine');
 
 /**
- * Validates a Gemini API key. Real keys start with 'AIzaSy'.
+ * Validates a Gemini API key.
  */
-const isValidGeminiKey = (key) => typeof key === 'string' && key.startsWith('AIzaSy') && key.length > 30;
+const isValidGeminiKey = (key) => typeof key === 'string' && key.length > 30 && key !== 'your_gemini_api_key_here';
+const hasGroqKey = () => Boolean(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here');
+
+const callGroqChat = async (prompt, options = {}) => {
+  if (!hasGroqKey()) throw new Error('GROQ_API_KEY is not configured');
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  const chatCompletion = await groq.chat.completions.create({
+    messages: [{ role: "user", content: prompt }],
+    model: "openai/gpt-oss-120b",
+  });
+  return cleanAIJsonText(chatCompletion.choices[0].message.content);
+};
 
 /**
  * Calls Gemini generative AI with model fallback chain.
@@ -163,10 +194,14 @@ const isValidGeminiKey = (key) => typeof key === 'string' && key.startsWith('AIz
 const callGeminiChat = async (prompt, options = {}) => {
   const key = process.env.GEMINI_API_KEY;
   if (!isValidGeminiKey(key)) {
-    throw new Error('Invalid or missing Gemini API key. Key must start with AIzaSy.');
+    if (hasGroqKey()) {
+      console.log('Invalid Gemini key, falling back to Groq...');
+      return callGroqChat(prompt, options);
+    }
+    throw new Error('Invalid or missing Gemini API key. Please check your .env file.');
   }
   const genAI = new GoogleGenerativeAI(key);
-  const modelNames = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro'];
+  const modelNames = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro'];
   let lastErr;
   for (const modelName of modelNames) {
     try {
@@ -178,9 +213,15 @@ const callGeminiChat = async (prompt, options = {}) => {
       if (err.message && (err.message.includes('not found') || err.message.includes('404') || err.message.includes('deprecated'))) {
         continue; // try next model
       }
-      throw err; // throw non-model errors immediately
+      break; // For other errors like quota, try fallback immediately
     }
   }
+  
+  if (hasGroqKey()) {
+    console.log('Gemini calls failed, falling back to Groq...');
+    return callGroqChat(prompt, options);
+  }
+  
   throw lastErr;
 };
 
@@ -492,6 +533,7 @@ mongoose.connect(MONGODB_URI, {
 
     seedDefaultData();
     seedQuizData();
+    seedResumeSections();
     cleanupDuplicateLeaderboardEntries();
   })
   .catch(err => {
@@ -608,8 +650,20 @@ const ResumeDataSchema = new mongoose.Schema({
   achievements: { type: Array, default: [] },
   technologies: { type: Array, default: [] },
   publications: { type: Array, default: [] },
+  dynamicSections: { type: Object, default: {} },
   rawText: { type: String, default: '' },
   parsedAt: { type: Date, default: Date.now }
+});
+
+const ResumeSectionSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  key: { type: String, required: true, unique: true },
+  icon: { type: String, default: 'FaFileAlt' },
+  description: { type: String, default: '' },
+  displayOrder: { type: Number, default: 0 },
+  isActive: { type: Boolean, default: true },
+  isRequired: { type: Boolean, default: false },
+  allowMultiple: { type: Boolean, default: false }
 });
 
 const ResumeInterviewSchema = new mongoose.Schema({
@@ -635,6 +689,7 @@ const ResumeInterviewSchema = new mongoose.Schema({
 
 const ResumeData = mongoose.models.ResumeData || mongoose.model('ResumeData', ResumeDataSchema);
 const ResumeInterview = mongoose.models.ResumeInterview || mongoose.model('ResumeInterview', ResumeInterviewSchema);
+const ResumeSection = mongoose.models.ResumeSection || mongoose.model('ResumeSection', ResumeSectionSchema);
 
 // Seed default data to MongoDB if connected and empty
 async function seedDefaultData() {
@@ -663,6 +718,49 @@ async function seedQuizData() {
     console.log(`Quiz categories synced to MongoDB: ${QUIZ_CATEGORIES.length}`);
   } catch (err) {
     console.error('Error seeding quiz categories:', err);
+  }
+}
+
+const DEFAULT_RESUME_SECTIONS = [
+  { name: 'Summary', key: 'summary', icon: 'FaFileAlt', description: 'A brief overview of your professional background.', isRequired: true, allowMultiple: false },
+  { name: 'Skills', key: 'skills', icon: 'FaCode', description: 'Core competencies and technical skills.', isRequired: true, allowMultiple: true },
+  { name: 'Experience', key: 'experience', icon: 'FaBriefcase', description: 'Your professional work history.', isRequired: false, allowMultiple: true },
+  { name: 'Internships', key: 'internships', icon: 'FaUserGraduate', description: 'Internships and trainee programs.', isRequired: false, allowMultiple: true },
+  { name: 'Projects', key: 'projects', icon: 'FaFolderOpen', description: 'Notable projects you have built.', isRequired: false, allowMultiple: true },
+  { name: 'Education', key: 'education', icon: 'FaGraduationCap', description: 'Academic background and degrees.', isRequired: true, allowMultiple: true },
+  { name: 'Certifications', key: 'certifications', icon: 'FaCertificate', description: 'Professional certifications and licenses.', isRequired: false, allowMultiple: true },
+  { name: 'Achievements', key: 'achievements', icon: 'FaTrophy', description: 'Notable awards and accomplishments.', isRequired: false, allowMultiple: true },
+  { name: 'Technologies', key: 'technologies', icon: 'FaLaptopCode', description: 'Tools and frameworks you use.', isRequired: false, allowMultiple: true },
+  { name: 'Publications', key: 'publications', icon: 'FaBook', description: 'Published papers or articles.', isRequired: false, allowMultiple: true },
+  { name: 'Research', key: 'research', icon: 'FaMicroscope', description: 'Academic or professional research.', isRequired: false, allowMultiple: true },
+  { name: 'Patents', key: 'patents', icon: 'FaLightbulb', description: 'Patents filed or granted.', isRequired: false, allowMultiple: true },
+  { name: 'Awards', key: 'awards', icon: 'FaMedal', description: 'Honors and awards received.', isRequired: false, allowMultiple: true },
+  { name: 'Volunteer Experience', key: 'volunteer', icon: 'FaHandsHelping', description: 'Volunteer work and community service.', isRequired: false, allowMultiple: true },
+  { name: 'Positions of Responsibility', key: 'responsibility', icon: 'FaUsers', description: 'Leadership roles in clubs or organizations.', isRequired: false, allowMultiple: true },
+  { name: 'Hackathons', key: 'hackathons', icon: 'FaLaptop', description: 'Hackathons participated in.', isRequired: false, allowMultiple: true },
+  { name: 'Competitions', key: 'competitions', icon: 'FaFlagCheckered', description: 'Competitive programming or other contests.', isRequired: false, allowMultiple: true },
+  { name: 'Training', key: 'training', icon: 'FaChalkboardTeacher', description: 'Professional training completed.', isRequired: false, allowMultiple: true },
+  { name: 'Workshops', key: 'workshops', icon: 'FaTools', description: 'Workshops attended or conducted.', isRequired: false, allowMultiple: true },
+  { name: 'Languages', key: 'languages', icon: 'FaLanguage', description: 'Languages you can speak or write.', isRequired: false, allowMultiple: true },
+  { name: 'Interests', key: 'interests', icon: 'FaHeart', description: 'Hobbies and personal interests.', isRequired: false, allowMultiple: true },
+  { name: 'Extracurricular Activities', key: 'extracurricular', icon: 'FaFutbol', description: 'Activities outside of academics/work.', isRequired: false, allowMultiple: true },
+  { name: 'References', key: 'references', icon: 'FaAddressBook', description: 'Professional references.', isRequired: false, allowMultiple: true },
+];
+
+async function seedResumeSections() {
+  try {
+    const count = await ResumeSection.countDocuments();
+    if (count === 0) {
+      console.log('🌱 Seeding default resume sections to MongoDB...');
+      const sectionsToInsert = DEFAULT_RESUME_SECTIONS.map((sec, index) => ({
+        ...sec,
+        displayOrder: index
+      }));
+      await ResumeSection.insertMany(sectionsToInsert);
+      console.log(`✅ Seeded ${sectionsToInsert.length} resume sections!`);
+    }
+  } catch (err) {
+    console.error('Error seeding resume sections:', err);
   }
 }
 
@@ -1253,10 +1351,7 @@ app.post('/api/interview/generate', async (req, res) => {
 
     if (!cleanedText && process.env.GEMINI_API_KEY) {
       try {
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-        const result = await model.generateContent(prompt);
-        cleanedText = cleanAIJsonText(result.response.text());
+        cleanedText = await callGeminiChat(prompt);
       } catch (err) {
         console.log("Gemini API Error. Falling back to xAI/Groq...");
       }
@@ -1289,7 +1384,7 @@ app.post('/api/interview/generate', async (req, res) => {
       cleanedText = cleanAIJsonText(chatCompletion.choices[0].message.content);
     }
 
-    const questions = JSON.parse(cleanedText);
+    const questions = parseAiJsonSafely(cleanedText, []);
 
     res.json({ success: true, questions });
   } catch (error) {
@@ -1344,10 +1439,7 @@ app.post('/api/interview/evaluate', async (req, res) => {
 
     if (!cleanedText && process.env.GEMINI_API_KEY) {
       try {
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-        const result = await model.generateContent(prompt);
-        cleanedText = cleanAIJsonText(result.response.text());
+        cleanedText = await callGeminiChat(prompt);
       } catch (err) {
         console.log("Gemini API Error. Falling back to xAI/Groq for evaluation...");
       }
@@ -1378,7 +1470,7 @@ app.post('/api/interview/evaluate', async (req, res) => {
       cleanedText = cleanAIJsonText(chatCompletion.choices[0].message.content);
     }
 
-    const evaluation = JSON.parse(cleanedText);
+    const evaluation = parseAiJsonSafely(cleanedText, []);
 
     res.json({ success: true, evaluation });
   } catch (error) {
@@ -1588,7 +1680,7 @@ ${rawText.substring(0, 25000)}
         } else {
           text = await callXAIChat(prompt);
         }
-        const parsed = JSON.parse(text);
+        const parsed = parseAiJsonSafely(text, {});
         let mergedSkills = [];
         if (Array.isArray(parsed.skills)) mergedSkills.push(...parsed.skills);
         if (Array.isArray(parsed.technologies)) mergedSkills.push(...parsed.technologies);
@@ -2019,6 +2111,125 @@ app.post('/api/resume/proctor-violation', async (req, res) => {
   const { userId, eventType } = req.body;
   console.log(`Proctoring violation logged for ${userId}: ${eventType}`);
   res.json({ success: true });
+});
+
+// --- Admin Resume Section Endpoints ---
+
+app.get('/api/admin/sections', async (req, res) => {
+  if (isMongoDBConnected) {
+    try {
+      const sections = await ResumeSection.find().sort({ displayOrder: 1 });
+      res.json({ success: true, sections });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const data = readFallbackData();
+    res.json({ success: true, sections: data.resumeSections || DEFAULT_RESUME_SECTIONS });
+  }
+});
+
+app.post('/api/admin/sections', async (req, res) => {
+  const { name, key, icon, description, isRequired, allowMultiple, isActive } = req.body;
+  if (!name || !key) return res.status(400).json({ error: 'Name and Key are required' });
+
+  if (isMongoDBConnected) {
+    try {
+      const count = await ResumeSection.countDocuments();
+      const newSection = new ResumeSection({
+        name, key, icon, description, isRequired, allowMultiple, isActive,
+        displayOrder: count
+      });
+      await newSection.save();
+      res.status(201).json({ success: true, section: newSection });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const data = readFallbackData();
+    if (!data.resumeSections) data.resumeSections = [...DEFAULT_RESUME_SECTIONS];
+    const newSection = {
+      _id: Date.now().toString(),
+      name, key, icon, description, isRequired, allowMultiple, isActive: isActive !== false,
+      displayOrder: data.resumeSections.length
+    };
+    data.resumeSections.push(newSection);
+    writeFallbackData(data);
+    res.status(201).json({ success: true, section: newSection });
+  }
+});
+
+app.put('/api/admin/sections/reorder', async (req, res) => {
+  const { orderedIds } = req.body; // array of _id or key strings in new order
+  if (!Array.isArray(orderedIds)) return res.status(400).json({ error: 'orderedIds must be an array' });
+
+  if (isMongoDBConnected) {
+    try {
+      const bulkOps = orderedIds.map((id, index) => ({
+        updateOne: {
+          filter: { _id: id },
+          update: { displayOrder: index }
+        }
+      }));
+      await ResumeSection.bulkWrite(bulkOps);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const data = readFallbackData();
+    if (!data.resumeSections) data.resumeSections = [...DEFAULT_RESUME_SECTIONS];
+    orderedIds.forEach((id, index) => {
+      const section = data.resumeSections.find(s => s._id === id || s.key === id);
+      if (section) section.displayOrder = index;
+    });
+    data.resumeSections.sort((a, b) => a.displayOrder - b.displayOrder);
+    writeFallbackData(data);
+    res.json({ success: true });
+  }
+});
+
+app.put('/api/admin/sections/:id', async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+
+  if (isMongoDBConnected) {
+    try {
+      const updated = await ResumeSection.findByIdAndUpdate(id, updates, { new: true });
+      res.json({ success: true, section: updated });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const data = readFallbackData();
+    if (!data.resumeSections) data.resumeSections = [...DEFAULT_RESUME_SECTIONS];
+    const index = data.resumeSections.findIndex(s => s._id === id || s.key === id);
+    if (index !== -1) {
+      data.resumeSections[index] = { ...data.resumeSections[index], ...updates };
+      writeFallbackData(data);
+      res.json({ success: true, section: data.resumeSections[index] });
+    } else {
+      res.status(404).json({ error: 'Section not found' });
+    }
+  }
+});
+
+app.delete('/api/admin/sections/:id', async (req, res) => {
+  const { id } = req.params;
+  if (isMongoDBConnected) {
+    try {
+      await ResumeSection.findByIdAndDelete(id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    const data = readFallbackData();
+    if (!data.resumeSections) data.resumeSections = [...DEFAULT_RESUME_SECTIONS];
+    data.resumeSections = data.resumeSections.filter(s => s._id !== id && s.key !== id);
+    writeFallbackData(data);
+    res.json({ success: true });
+  }
 });
 
 // Start Express Server

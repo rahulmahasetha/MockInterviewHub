@@ -126,10 +126,10 @@ class RAGEngine {
   }
 
   /**
-   * Validates the API key format. Gemini keys start with 'AIzaSy'.
+   * Validates the API key format.
    */
   _isValidGeminiKey(key) {
-    return typeof key === 'string' && key.startsWith('AIzaSy') && key.length > 30;
+    return typeof key === 'string' && key.length > 30 && key !== 'your_gemini_api_key_here';
   }
 
   /**
