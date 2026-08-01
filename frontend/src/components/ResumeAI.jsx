@@ -7,7 +7,8 @@ import {
   FaSpinner, FaHistory, FaExclamationTriangle, FaBrain, FaDatabase,
   FaSearch, FaChartBar, FaFileAlt, FaCode, FaCog
 } from 'react-icons/fa';
-import ProctorPanel from './ProctorPanel';
+import PreInterviewCheck from './PreInterviewCheck';
+import MiniProctoring from './MiniProctoring';
 
 /* ─────────────────────────────────────────────
    PIPELINE STEP COMPONENT
@@ -118,6 +119,7 @@ export default function ResumeAI() {
   const [isAISpeaking, setIsAISpeaking] = useState(false);
 
   const [violations, setViolations] = useState(0);
+  const [passedPreCheck, setPassedPreCheck] = useState(false);
   const MAX_VIOLATIONS = 3;
 
   const [report, setReport] = useState(null);
@@ -168,6 +170,10 @@ export default function ResumeAI() {
       recognitionRef.current = r;
     }
   }, []);
+  const handleTerminate = () => {
+    alert('Maximum proctoring violations reached. Auto-submitting interview.');
+    finishInterview(true);
+  };
 
   const handleProctorViolation = useCallback((type) => {
     if (phase !== 'interview') return;
@@ -772,13 +778,7 @@ export default function ResumeAI() {
             </div>
           </div>
 
-          <ProctorPanel
-            active={phase === 'interview'}
-            title="Interview Proctor"
-            subtitle="Camera, mic, focus, fullscreen"
-            violations={violations}
-            maxViolations={MAX_VIOLATIONS}
-          />
+          <MiniProctoring violations={violations} maxViolations={MAX_VIOLATIONS} onViolation={handleProctorViolation} onTerminate={handleTerminate} />
         </div>
       </div>
     );

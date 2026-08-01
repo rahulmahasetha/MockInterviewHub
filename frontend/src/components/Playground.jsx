@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 // LevelMarker removed — using clean quiz layout
 import MCQCard from './MCQCard';
+import PreInterviewCheck from './PreInterviewCheck';
+import MiniProctoring from './MiniProctoring';
 import { useUserProgress } from '../context/UserProgressContext';
 import { quizAPI } from '../services/api';
 import {
@@ -28,13 +30,9 @@ export default function Playground() {
   const [categoryData, setCategoryData] = useState(null);
   const [isLoadingCategory, setIsLoadingCategory] = useState(true);
   const [showProgressOverview, setShowProgressOverview] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
-  const [micReady, setMicReady] = useState(false);
-  const [faceDetected, setFaceDetected] = useState(false);
-  const [proctorError, setProctorError] = useState('');
-  const [tabSwitches, setTabSwitches] = useState(0);
-  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [passedPreCheck, setPassedPreCheck] = useState(false);
+  const [violations, setViolations] = useState(0);
+  const MAX_VIOLATIONS = 10;
 
   useEffect(() => {
     async function loadCategory() {
@@ -56,96 +54,14 @@ export default function Playground() {
     loadCategory();
   }, [category]);
 
-  useEffect(() => {
-    let stream;
-    let cancelled = false;
+  const handleProctorViolation = () => {
+    setViolations(prev => Math.min(prev + 1, MAX_VIOLATIONS));
+  };
 
-    async function setupProctoringStream() {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setProctorError('Camera access is not supported by this browser.');
-        return;
-      }
-
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        if (cancelled) {
-          stream.getTracks().forEach(track => track.stop());
-          return;
-        }
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-
-        setCameraReady(stream.getVideoTracks().some(track => track.readyState === 'live'));
-        setMicReady(stream.getAudioTracks().some(track => track.readyState === 'live'));
-        setProctorError('');
-      } catch (error) {
-        setCameraReady(false);
-        setMicReady(false);
-        setProctorError('Allow camera and microphone access to enable live proctoring.');
-      }
-    }
-
-    setupProctoringStream();
-
-    return () => {
-      cancelled = true;
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        setTabSwitches(count => count + 1);
-      }
-    };
-
-    const handleFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!cameraReady) {
-      setFaceDetected(false);
-      return undefined;
-    }
-
-    if (!('FaceDetector' in window)) {
-      setFaceDetected(true);
-      return undefined;
-    }
-
-    const detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
-    const interval = window.setInterval(async () => {
-      if (!videoRef.current || videoRef.current.readyState < 2) return;
-
-      try {
-        const faces = await detector.detect(videoRef.current);
-        setFaceDetected(faces.length > 0);
-      } catch (error) {
-        setFaceDetected(true);
-      }
-    }, 1600);
-
-    return () => window.clearInterval(interval);
-  }, [cameraReady]);
+  const handleTerminate = () => {
+    alert('Maximum proctoring violations reached. Terminating quiz.');
+    navigate('/home');
+  };
 
   function onLevelClick(level) {
     setSelectedLevel(level);
@@ -170,13 +86,16 @@ export default function Playground() {
   const categoryTitle = categoryData?.name || (category ? category.charAt(0).toUpperCase() + category.slice(1) : 'Quest');
   const categoryColor = categoryData?.iconColor || '#2563eb';
   const categoryLabel = categoryData?.label || 'QZ';
-  const warningCount = Number(!cameraReady) + Number(!micReady) + Number(!isFullscreen) + Number(!isOnline) + tabSwitches;
-  const proctorStatus = warningCount === 0 ? 'Secure' : warningCount <= 2 ? 'Watch' : 'Review';
 
   // map positions removed
 
+  if (!passedPreCheck) {
+    return <PreInterviewCheck onComplete={() => setPassedPreCheck(true)} />;
+  }
+
   return (
     <div className="playground-container app-shell">
+      <MiniProctoring violations={violations} maxViolations={MAX_VIOLATIONS} onViolation={handleProctorViolation} onTerminate={handleTerminate} />
       <header className="playground-header">
         <div className="header-content">
           <button onClick={() => navigate('/')} className="back-button nav-button">
@@ -196,24 +115,6 @@ export default function Playground() {
             </button>
             <div className="score-badge">{currentScore} Points</div>
           </nav>
-        </div>
-
-        <div className="proctor-topbar" aria-label="Proctoring status">
-          <div className="proctor-session">
-            <span className={`proctor-live-dot ${proctorStatus.toLowerCase()}`}></span>
-            <div>
-              <strong>AI Proctoring</strong>
-              <span>{proctorStatus} session monitoring</span>
-            </div>
-          </div>
-
-          <div className="proctor-topbar-items">
-            <span className={`proctor-pill ${cameraReady ? 'ok' : 'alert'}`}><FaVideo /> Camera</span>
-            <span className={`proctor-pill ${micReady ? 'ok' : 'alert'}`}><FaMicrophone /> Mic</span>
-            <span className={`proctor-pill ${faceDetected ? 'ok' : 'alert'}`}><FaEye /> Face</span>
-            <span className={`proctor-pill ${isFullscreen ? 'ok' : 'warn'}`}><FaExpand /> Fullscreen</span>
-            <span className={`proctor-pill ${isOnline ? 'ok' : 'alert'}`}><FaWifi /> Online</span>
-          </div>
         </div>
       </header>
 
@@ -340,73 +241,7 @@ export default function Playground() {
           </section>
 
           <aside className="sidebar quiz-sidebar">
-            <section className="proctor-card" aria-label="Live AI proctoring panel">
-              <div className="proctor-card-header">
-                <div>
-                  <h4>Proctor Monitor</h4>
-                  <span>Live environment checks</span>
-                </div>
-                <span className={`proctor-risk ${proctorStatus.toLowerCase()}`}>{proctorStatus}</span>
-              </div>
 
-              <div className="webcam-preview">
-                <video ref={videoRef} autoPlay muted playsInline />
-                {!cameraReady && (
-                  <div className="webcam-placeholder">
-                    <FaVideo />
-                    <span>Camera permission needed</span>
-                  </div>
-                )}
-                <div className="face-frame">
-                  <span>{faceDetected ? 'Face detected' : 'No face signal'}</span>
-                </div>
-              </div>
-
-              <div className="proctor-check-grid">
-                <div className={`proctor-check ${micReady ? 'ok' : 'alert'}`}>
-                  <FaMicrophone />
-                  <div><strong>Microphone</strong><span>{micReady ? 'Active input' : 'Permission needed'}</span></div>
-                </div>
-                <div className={`proctor-check ${faceDetected ? 'ok' : 'alert'}`}>
-                  <FaEye />
-                  <div><strong>Face Detection</strong><span>{faceDetected ? 'Single face visible' : 'Waiting for camera'}</span></div>
-                </div>
-                <div className={`proctor-check ${tabSwitches === 0 ? 'ok' : 'warn'}`}>
-                  <FaDesktop />
-                  <div><strong>Tab Switches</strong><span>{tabSwitches} detected</span></div>
-                </div>
-                <div className={`proctor-check ${isFullscreen ? 'ok' : 'warn'}`}>
-                  <FaExpand />
-                  <div><strong>Fullscreen</strong><span>{isFullscreen ? 'Enabled' : 'Not enabled'}</span></div>
-                </div>
-                <div className={`proctor-check ${isOnline ? 'ok' : 'alert'}`}>
-                  <FaWifi />
-                  <div><strong>Internet</strong><span>{isOnline ? 'Stable connection' : 'Offline'}</span></div>
-                </div>
-              </div>
-
-              {!isFullscreen && (
-                <button type="button" className="fullscreen-action" onClick={requestFullscreen}>
-                  <FaExpand /> Enter Fullscreen
-                </button>
-              )}
-
-              <div className="warning-panel">
-                <div className="warning-panel-title">
-                  <FaBell />
-                  <strong>Warnings</strong>
-                  <span>{warningCount}</span>
-                </div>
-                <div className="warning-list">
-                  {proctorError && <p className="warning-item danger"><FaExclamationTriangle /> {proctorError}</p>}
-                  {!isFullscreen && <p className="warning-item"><FaExclamationTriangle /> Fullscreen monitoring is not active.</p>}
-                  {tabSwitches > 0 && <p className="warning-item"><FaExclamationTriangle /> Tab switching was detected {tabSwitches} time{tabSwitches > 1 ? 's' : ''}.</p>}
-                  {isOnline && cameraReady && micReady && isFullscreen && tabSwitches === 0 && (
-                    <p className="warning-item success"><FaCheckCircle /> No warnings. Keep the quiz window focused.</p>
-                  )}
-                </div>
-              </div>
-            </section>
 
             <div className="sidebar-top">
               <h4>Your Progress</h4>

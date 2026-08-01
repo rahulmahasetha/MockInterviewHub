@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { interviewAPI, leaderboardAPI } from '../services/api';
 import { useUserProgress } from '../context/UserProgressContext';
 import { FaRobot, FaArrowLeft, FaCheckCircle, FaSpinner, FaMicrophone, FaStop } from 'react-icons/fa';
-import ProctorPanel from './ProctorPanel';
+import PreInterviewCheck from './PreInterviewCheck';
+import MiniProctoring from './MiniProctoring';
 
 export default function MockInterview() {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ export default function MockInterview() {
   const [isRecording, setIsRecording] = useState(false);
   const [interviewMode, setInterviewMode] = useState('written'); // 'written' or 'speaking'
   const [violations, setViolations] = useState(0);
+  const [passedPreCheck, setPassedPreCheck] = useState(false);
   const recognitionRef = useRef(null);
 
   useEffect(() => {
@@ -90,6 +92,11 @@ export default function MockInterview() {
     "HTML", "CSS", "JavaScript", "React", "Node.js", 
     "Express", "MongoDB", "Java", "C++", "Python", "Full Stack"
   ];
+
+  const handleTerminate = () => {
+    alert('Maximum proctoring violations reached. Auto-submitting interview.');
+    setStep('summary');
+  };
 
   const handleProctorViolation = useCallback(() => {
     if (step !== 'session') return;
@@ -213,6 +220,10 @@ export default function MockInterview() {
     setEvaluations([]);
     setViolations(0);
   };
+
+  if (!passedPreCheck) {
+    return <PreInterviewCheck onComplete={() => setPassedPreCheck(true)} />;
+  }
 
   return (
     <div className="dashboard-container app-shell" style={{ minHeight: '100vh', padding: '40px 20px' }}>
@@ -348,14 +359,7 @@ export default function MockInterview() {
               </div>
             </div>
 
-            <ProctorPanel
-              active={step === 'session'}
-              title="Interview Proctor"
-              subtitle="Camera, mic, focus, fullscreen"
-              violations={violations}
-              maxViolations={MAX_VIOLATIONS}
-              onTabSwitch={handleProctorViolation}
-            />
+            <MiniProctoring violations={violations} maxViolations={MAX_VIOLATIONS} onViolation={handleProctorViolation} onTerminate={handleTerminate} />
           </div>
         )}
 
