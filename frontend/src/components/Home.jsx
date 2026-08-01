@@ -44,9 +44,8 @@ export default function Home() {
   const [sbBeExpanded, setSbBeExpanded] = useState(false);
 
   // Profile View States
-  const [editMode, setEditMode] = useState(false);
-  const [profileTab, setProfileTab] = useState("details"); // 'details' or 'interview'
-  
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    
   // Editable fields
   const [profileUsername, setProfileUsername] = useState(progress?.username || "");
   const [profileFullName, setProfileFullName] = useState(progress?.fullName || "");
@@ -167,7 +166,7 @@ export default function Home() {
     setIsSubmitting(false);
     
     if (res.success) {
-      setEditMode(false);
+      setIsSettingsModalOpen(false);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -179,16 +178,14 @@ export default function Home() {
 
   const openProfileDetails = () => {
     setActiveNav('profile');
-    setProfileTab('details');
-    setEditMode(false);
+    setIsSettingsModalOpen(false);
     setDropdownOpen(false);
     closeSidebar();
   };
 
   const openProfileSettings = () => {
     setActiveNav('profile');
-    setProfileTab('details');
-    setEditMode(true);
+    setIsSettingsModalOpen(true);
     setDropdownOpen(false);
     closeSidebar();
   };
@@ -200,11 +197,11 @@ export default function Home() {
     return () => document.removeEventListener("keydown", handler);
   }, [closeSidebar]);
 
-  // Lock body scroll when sidebar overlay is open
+  // Lock body scroll when sidebar overlay or settings modal is open
   useEffect(() => {
-    document.body.style.overflow = sidebarOpen ? "hidden" : "";
+    document.body.style.overflow = (sidebarOpen || isSettingsModalOpen) ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [sidebarOpen]);
+  }, [sidebarOpen, isSettingsModalOpen]);
 
   useEffect(() => {
     async function loadCategories() {
@@ -818,17 +815,9 @@ export default function Home() {
 
                  {/* Right: Actions */}
                  <div className="profile-hero-actions">
-                  {profileTab === 'details' && (
-                    editMode ? (
-                      <button className="btn-secondary" onClick={() => setEditMode(false)}>
-                        View Details
-                      </button>
-                    ) : (
-                      <button className="btn-primary" onClick={openProfileSettings} title="Edit profile settings">
-                        <span>⚙️</span> Settings
-                      </button>
-                    )
-                  )}
+                   <button className="btn-primary" onClick={openProfileSettings} title="Edit profile settings">
+                     <span>⚙️</span> Settings
+                   </button>
                  </div>
                </div>
              </div>
@@ -864,148 +853,7 @@ export default function Home() {
                  </div>
                </div>
              </div>
-
-             {/* Tab Navigation */}
-             <div className="profile-tabs-nav">
-               <button className={`profile-tab-btn ${profileTab === 'details' ? 'active' : ''}`} onClick={() => { setProfileTab('details'); setEditMode(false); }}>
-                 👤 Profile Details
-               </button>
-               <button className={`profile-tab-btn ${profileTab === 'interview' ? 'active' : ''}`} onClick={() => { setProfileTab('interview'); setEditMode(false); }}>
-                 🤖 Interview Performance
-               </button>
-             </div>
-
-             {/* Details Tab */}
-             {profileTab === 'details' && (
-               <div className="profile-tab-content">
-               <div className="profile-grid-layout">
-                  {/* Left Column: Progress */}
-                  <div className="profile-left-col">
-                    <div className="profile-card">
-                      <div className="card-header">
-                        <h3>Level Progress</h3>
-                        <span className="card-header-badge">{XP} / {LEVEL * 200} XP</span>
-                      </div>
-                      <div className="card-body">
-                        <div className="progress-bar-container-lg">
-                          <div className="progress-bar-fill-lg" style={{ width: `${Math.min(100, (XP % 200) / 2)}%` }}></div>
-                        </div>
-                        <p className="progress-text-muted">You need {(LEVEL * 200) - XP} more XP to reach Level {LEVEL + 1}.</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column: Edit Form or Account Info */}
-                  <div className="profile-right-col">
-                    <div className="profile-card">
-                      <div className="card-header">
-                        <h3>{editMode ? "Edit Profile Settings" : "Account Information"}</h3>
-                      </div>
-                      <div className="card-body">
-                        {editMode ? (
-                          <form className="profile-edit-form" onSubmit={handleProfileUpdate}>
-                            <div className="form-row-grid">
-                              <div className="form-group">
-                                <label>Full Name</label>
-                                <input type="text" className="form-input" value={profileFullName} onChange={e => setProfileFullName(e.target.value)} placeholder="Full Name" disabled={isSubmitting} />
-                              </div>
-                              <div className="form-group">
-                                <label>Username <span className="text-muted">(Read-only)</span></label>
-                                <input type="text" className="form-input" value={profileUsername} disabled />
-                              </div>
-                            </div>
-
-                            <div className="form-row-grid">
-                              <div className="form-group">
-                                <label>Email Address <span className="text-danger">*</span></label>
-                                <input type="email" className="form-input" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} required placeholder="name@gmail.com" disabled={isSubmitting} />
-                              </div>
-                              <div className="form-group">
-                                <label>College Name</label>
-                                <input type="text" className="form-input" value={collegeName} onChange={e => setCollegeName(e.target.value)} placeholder="e.g. Stanford University" disabled={isSubmitting} />
-                              </div>
-                            </div>
-
-                            <div className="form-row-grid">
-                              <div className="form-group">
-                                <label>Branch / Department</label>
-                                <input type="text" className="form-input" value={branch} onChange={e => setBranch(e.target.value)} placeholder="e.g. Computer Science" disabled={isSubmitting} />
-                              </div>
-                              <div className="form-group">
-                                <label>Year / Semester</label>
-                                <input type="text" className="form-input" value={year} onChange={e => setYear(e.target.value)} placeholder="e.g. 3rd Year" disabled={isSubmitting} />
-                              </div>
-                            </div>
-
-                            <div className="password-section-divider">
-                              <h4>🔐 Change Password <span className="text-muted">(Optional)</span></h4>
-                            </div>
-
-                            <div className="form-group">
-                              <label>Current Password</label>
-                              <input type="password" className="form-input" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Required only if changing password" disabled={isSubmitting} />
-                            </div>
-
-                            <div className="form-row-grid">
-                              <div className="form-group">
-                                <label>New Password</label>
-                                <input type="password" className="form-input" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Minimum 6 characters" disabled={isSubmitting} />
-                              </div>
-                              <div className="form-group">
-                                <label>Confirm New Password</label>
-                                <input type="password" className="form-input" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat new password" disabled={isSubmitting} />
-                              </div>
-                            </div>
-
-                            <div className="form-actions">
-                              <button type="submit" className="btn-primary" disabled={isSubmitting}>
-                                {isSubmitting ? 'Saving...' : 'Save Changes'}
-                              </button>
-                              <button type="button" className="btn-secondary" onClick={() => { setEditMode(false); }} disabled={isSubmitting}>Cancel</button>
-                            </div>
-                          </form>
-                        ) : (
-                          <div className="profile-details-list">
-                            <div className="detail-row">
-                              <div className="detail-icon">👤</div>
-                              <div className="detail-content">
-                                <span className="detail-label">Full Name</span>
-                                <span className="detail-value">{progress.fullName || progress.username}</span>
-                              </div>
-                            </div>
-                            <div className="detail-row">
-                              <div className="detail-icon">🏫</div>
-                              <div className="detail-content">
-                                <span className="detail-label">College</span>
-                                <span className="detail-value">{collegeName || '—'}</span>
-                              </div>
-                            </div>
-                            <div className="detail-row">
-                              <div className="detail-icon">📚</div>
-                              <div className="detail-content">
-                                <span className="detail-label">Branch / Department</span>
-                                <span className="detail-value">{branch || '—'}</span>
-                              </div>
-                            </div>
-                            <div className="detail-row">
-                              <div className="detail-icon">📅</div>
-                              <div className="detail-content">
-                                <span className="detail-label">Year / Semester</span>
-                                <span className="detail-value">{year || '—'}</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-               </div>
-               </div>
-             )}
-
-             {/* Interview Dashboard Tab */}
-             {profileTab === 'interview' && (
-               <div className="profile-tab-content">
+             <div className="profile-tab-content">
                  <div className="profile-grid-layout">
                    {interviews.length === 0 ? (
                      <>
@@ -1112,15 +960,15 @@ export default function Home() {
                              </div>
                            </div>
 
-                           <div className="profile-right-col">
-                             <div className="profile-card profile-card-stable">
-                               <div className="card-header">
-                                 <h3>Latest Session Analysis ({latestInterview.topic})</h3>
+                            <div className="profile-right-col">
+                              <div className="profile-card profile-card-stable">
+                                <div className="card-header">
+                                  <h3>Latest Session Analysis ({latestInterview.topic})</h3>
                                  <span className="card-header-date">
                                    {new Date(latestInterview.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                                  </span>
                                </div>
-                               <div className="card-body interview-card-scroll">
+                               <div className="card-body interview-card-scroll" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                                  <div className="iv-feedback-quote">
                                    <p>"{latestInterview.feedbackSummary}"</p>
                                  </div>
@@ -1180,7 +1028,7 @@ export default function Home() {
                    )}
                  </div>
                </div>
-              )}
+              
            </div>
          )}
         {/* Category groups for activeNav === 'all' / 'prog' / 'fe' / 'be' */}
@@ -1232,6 +1080,81 @@ export default function Home() {
         )}
       </main>
       </div>
+
+      {/* Settings Modal */}
+      {isSettingsModalOpen && (
+        <div className="instructions-overlay" onClick={() => setIsSettingsModalOpen(false)}>
+          <div className="instructions-modal" onClick={e => e.stopPropagation()} style={{maxWidth: '600px'}}>
+            <div className="modal-header">
+              <h2>Edit Profile Settings</h2>
+              <button className="close-button" onClick={() => setIsSettingsModalOpen(false)}>✕</button>
+            </div>
+            <div className="card-body" style={{padding: '24px', display: 'block'}}>
+              <form className="profile-edit-form" onSubmit={handleProfileUpdate}>
+                            <div className="form-row-grid">
+                              <div className="form-group">
+                                <label>Full Name</label>
+                                <input type="text" className="form-input" value={profileFullName} onChange={e => setProfileFullName(e.target.value)} placeholder="Full Name" disabled={isSubmitting} />
+                              </div>
+                              <div className="form-group">
+                                <label>Username <span className="text-muted">(Read-only)</span></label>
+                                <input type="text" className="form-input" value={profileUsername} disabled />
+                              </div>
+                            </div>
+
+                            <div className="form-row-grid">
+                              <div className="form-group">
+                                <label>Email Address <span className="text-danger">*</span></label>
+                                <input type="email" className="form-input" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} required placeholder="name@gmail.com" disabled={isSubmitting} />
+                              </div>
+                              <div className="form-group">
+                                <label>College Name</label>
+                                <input type="text" className="form-input" value={collegeName} onChange={e => setCollegeName(e.target.value)} placeholder="e.g. Stanford University" disabled={isSubmitting} />
+                              </div>
+                            </div>
+
+                            <div className="form-row-grid">
+                              <div className="form-group">
+                                <label>Branch / Department</label>
+                                <input type="text" className="form-input" value={branch} onChange={e => setBranch(e.target.value)} placeholder="e.g. Computer Science" disabled={isSubmitting} />
+                              </div>
+                              <div className="form-group">
+                                <label>Year / Semester</label>
+                                <input type="text" className="form-input" value={year} onChange={e => setYear(e.target.value)} placeholder="e.g. 3rd Year" disabled={isSubmitting} />
+                              </div>
+                            </div>
+
+                            <div className="password-section-divider">
+                              <h4>🔐 Change Password <span className="text-muted">(Optional)</span></h4>
+                            </div>
+
+                            <div className="form-group">
+                              <label>Current Password</label>
+                              <input type="password" className="form-input" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Required only if changing password" disabled={isSubmitting} />
+                            </div>
+
+                            <div className="form-row-grid">
+                              <div className="form-group">
+                                <label>New Password</label>
+                                <input type="password" className="form-input" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Minimum 6 characters" disabled={isSubmitting} />
+                              </div>
+                              <div className="form-group">
+                                <label>Confirm New Password</label>
+                                <input type="password" className="form-input" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat new password" disabled={isSubmitting} />
+                              </div>
+                            </div>
+
+                            <div className="form-actions">
+                              <button type="submit" className="btn-primary" disabled={isSubmitting}>
+                                {isSubmitting ? 'Saving...' : 'Save Changes'}
+                              </button>
+                              <button type="button" className="btn-secondary" onClick={() => { setIsSettingsModalOpen(false); }} disabled={isSubmitting}>Cancel</button>
+                            </div>
+                          </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
