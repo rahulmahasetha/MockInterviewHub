@@ -20,7 +20,7 @@ graph TD
     Frontend -->|REST API Calls| Backend[Node.js / Express Backend]
     
     subgraph Backend Services
-        Backend -->|Extracts Text| PDFParser[Resume Parsing (pdf-parse)]
+        Backend -->|Extracts Text| PDFParser["Resume Parsing (pdf-parse)"]
         Backend -->|Stores Data| DB[(MongoDB Database)]
         Backend -->|Generates Questions & Feedback| LLM[Google Gemini AI]
     end
@@ -68,6 +68,4 @@ MockInterviewHub/
 - **OAuth Integration:** Add Google/LinkedIn social login for a seamless onboarding experience.
 - **Mobile Application:** Build a React Native app to allow users to practice interviews on the go.
 
-## 👨‍💻 About the Developers
 
-Built with passion by **Rahul Mahaseth** (with assistance from Antigravity AI). We aim to democratize access to high-quality career preparation tools for developers and job seekers worldwide. Feel free to contribute, open issues, or fork this repository!
