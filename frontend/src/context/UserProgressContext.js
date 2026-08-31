@@ -330,7 +330,7 @@ export function UserProgressProvider({ children }) {
       }
 
       const newPassed = [...new Set([...categoryProgress.passed, levelIndex])];
-      const scoreIncrement = rewardMeta.scoreIncrement ?? 20;
+      const scoreIncrement = rewardMeta.points ?? rewardMeta.scoreIncrement ?? 20;
       const newScore = categoryProgress.score + scoreIncrement;
       const isTopicComplete = rewardMeta.totalLevels && newPassed.length >= rewardMeta.totalLevels;
       const rewardEntries = [

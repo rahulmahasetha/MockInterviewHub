@@ -44,7 +44,8 @@ export default function MCQCard({ levelObj, category, onCorrectNextLevel, totalL
       setResult('correct');
       markPassed(category, levelObj.level, {
         totalLevels,
-        finishedUnderTime: timeLeft > 0
+        finishedUnderTime: timeLeft > 0,
+        points: levelObj.points
       });
     }
 
@@ -81,7 +82,7 @@ export default function MCQCard({ levelObj, category, onCorrectNextLevel, totalL
   }
 
   return (
-    <div className="mcq-card-inner">
+    <div className="mcq-card-inner" onContextMenu={(e) => e.preventDefault()}>
       <div className="mcq-timer">
         <p>
           Time Left: <span className={timeLeft <= 5 ? 'time-danger' : 'time-safe'}>{timeLeft}s</span>

@@ -32,7 +32,7 @@ export default function Playground() {
   const [showProgressOverview, setShowProgressOverview] = useState(false);
   const [passedPreCheck, setPassedPreCheck] = useState(false);
   const [violations, setViolations] = useState(0);
-  const MAX_VIOLATIONS = 10;
+  const MAX_VIOLATIONS = 5;
 
   useEffect(() => {
     async function loadCategory() {

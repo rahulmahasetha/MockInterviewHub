@@ -45,12 +45,18 @@ export default function MiniProctoring({ violations, maxViolations = 10, onViola
       }
     };
 
+    const handleBlur = () => {
+      onViolation();
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('blur', handleBlur);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('blur', handleBlur);
     };
   }, [onViolation]);
 

@@ -37,6 +37,9 @@ export const leaderboardAPI = {
 export const quizAPI = {
   getCategories: () => api.get('/quiz-categories'),
   getCategory: (slug) => api.get(`/quiz-categories/${slug}`),
+  createCategory: (data) => api.post('/quiz-categories', data),
+  updateCategory: (slug, data) => api.put(`/quiz-categories/${slug}`, data),
+  deleteCategory: (slug) => api.delete(`/quiz-categories/${slug}`),
 };
 
 // Interview Operations

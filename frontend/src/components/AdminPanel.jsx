@@ -1,248 +1,308 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { quizAPI } from '../services/api';
 import { toast } from 'react-toastify';
 import {
-  FaArrowLeft, FaPlus, FaGripVertical, FaEdit, FaTrash,
-  FaCheckCircle, FaTimesCircle, FaSave, FaTimes, FaCog
+  FaArrowLeft, FaPlus, FaEdit, FaTrash,
+  FaCheckCircle, FaTimesCircle, FaSave, FaTimes, FaCog,
+  FaFolder, FaQuestionCircle
 } from 'react-icons/fa';
-
-const API_BASE = 'http://localhost:3001/api';
 
 export default function AdminPanel() {
   const navigate = useNavigate();
-  const [sections, setSections] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [draggedItemIndex, setDraggedItemIndex] = useState(null);
   
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentSection, setCurrentSection] = useState({
-    name: '', key: '', icon: 'FaFileAlt', description: '',
-    isRequired: false, allowMultiple: false, isActive: true
+  // Category Modal
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isEditingCategory, setIsEditingCategory] = useState(false);
+  const [currentCategory, setCurrentCategory] = useState({
+    slug: '', name: '', label: '', color: '#E0F2FE', iconColor: '#0284C7', description: '', parentCategory: '', levels: []
   });
 
+  // Level Modal
+  const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
+  const [isEditingLevel, setIsEditingLevel] = useState(false);
+  const [currentLevel, setCurrentLevel] = useState({
+    level: 1, question: '', options: ['', '', '', ''], answer: '', hint: '', points: 10
+  });
+  const [activeCategorySlug, setActiveCategorySlug] = useState(null);
+
   useEffect(() => {
-    fetchSections();
+    fetchCategories();
   }, []);
 
-  const fetchSections = async () => {
+  const fetchCategories = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/admin/sections`);
-      setSections(res.data.sections || []);
+      const res = await quizAPI.getCategories();
+      setCategories(res.data || []);
     } catch (err) {
-      toast.error('Failed to load sections');
+      toast.error('Failed to load quiz categories');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDragStart = (e, index) => {
-    setDraggedItemIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e, index) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (draggedItemIndex === null || draggedItemIndex === index) return;
-
-    const newSections = [...sections];
-    const draggedItem = newSections[draggedItemIndex];
-    newSections.splice(draggedItemIndex, 1);
-    newSections.splice(index, 0, draggedItem);
-    
-    setDraggedItemIndex(index);
-    setSections(newSections);
-  };
-
-  const handleDragEnd = async () => {
-    setDraggedItemIndex(null);
-    try {
-      const orderedIds = sections.map(s => s._id || s.key);
-      await axios.put(`${API_BASE}/admin/sections/reorder`, { orderedIds });
-      toast.success('Sections reordered!');
-    } catch (err) {
-      toast.error('Failed to save order');
-      fetchSections(); // revert on fail
-    }
-  };
-
-  const toggleStatus = async (section) => {
-    try {
-      const id = section._id || section.key;
-      await axios.put(`${API_BASE}/admin/sections/${id}`, { isActive: !section.isActive });
-      setSections(sections.map(s => (s._id || s.key) === id ? { ...s, isActive: !s.isActive } : s));
-      toast.success(`${section.name} is now ${!section.isActive ? 'Active' : 'Inactive'}`);
-    } catch (err) {
-      toast.error('Failed to update status');
-    }
-  };
-
-  const handleDelete = async (section) => {
-    if (!window.confirm(`Are you sure you want to delete ${section.name}?`)) return;
-    try {
-      const id = section._id || section.key;
-      await axios.delete(`${API_BASE}/admin/sections/${id}`);
-      setSections(sections.filter(s => (s._id || s.key) !== id));
-      toast.success('Section deleted');
-    } catch (err) {
-      toast.error('Failed to delete section');
-    }
-  };
-
-  const openModal = (section = null) => {
-    if (section) {
-      setIsEditing(true);
-      setCurrentSection({ ...section });
+  const openCategoryModal = (category = null) => {
+    if (category) {
+      setIsEditingCategory(true);
+      setCurrentCategory({ ...category });
     } else {
-      setIsEditing(false);
-      setCurrentSection({
-        name: '', key: '', icon: 'FaFileAlt', description: '',
-        isRequired: false, allowMultiple: false, isActive: true
+      setIsEditingCategory(false);
+      setCurrentCategory({
+        slug: '', name: '', label: '', color: '#E0F2FE', iconColor: '#0284C7', description: '', parentCategory: '', levels: []
       });
     }
-    setIsModalOpen(true);
+    setIsCategoryModalOpen(true);
   };
 
-  const saveSection = async () => {
-    if (!currentSection.name || !currentSection.key) {
-      toast.error('Name and Key are required');
+  const saveCategory = async () => {
+    if (!currentCategory.slug || !currentCategory.name) {
+      toast.error('Slug and Name are required');
       return;
     }
     try {
-      if (isEditing) {
-        const id = currentSection._id || currentSection.key;
-        const res = await axios.put(`${API_BASE}/admin/sections/${id}`, currentSection);
-        setSections(sections.map(s => (s._id || s.key) === id ? res.data.section : s));
-        toast.success('Section updated');
+      if (isEditingCategory) {
+        const res = await quizAPI.updateCategory(currentCategory.slug, currentCategory);
+        setCategories(categories.map(c => c.slug === currentCategory.slug ? res.data : c));
+        toast.success('Category updated');
       } else {
-        const res = await axios.post(`${API_BASE}/admin/sections`, currentSection);
-        setSections([...sections, res.data.section]);
-        toast.success('Section created');
+        const res = await quizAPI.createCategory(currentCategory);
+        setCategories([...categories, res.data]);
+        toast.success('Category created');
       }
-      setIsModalOpen(false);
+      setIsCategoryModalOpen(false);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to save section');
+      toast.error(err.response?.data?.error || 'Failed to save category');
+    }
+  };
+
+  const deleteCategory = async (slug) => {
+    if (!window.confirm(`Are you sure you want to delete category ${slug}?`)) return;
+    try {
+      await quizAPI.deleteCategory(slug);
+      setCategories(categories.filter(c => c.slug !== slug));
+      toast.success('Category deleted');
+    } catch (err) {
+      toast.error('Failed to delete category');
+    }
+  };
+
+  const openLevelModal = (categorySlug, levelObj = null) => {
+    setActiveCategorySlug(categorySlug);
+    const category = categories.find(c => c.slug === categorySlug);
+    if (levelObj) {
+      setIsEditingLevel(true);
+      setCurrentLevel({ ...levelObj });
+    } else {
+      setIsEditingLevel(false);
+      setCurrentLevel({
+        level: category.levels.length + 1, question: '', options: ['', '', '', ''], answer: '', hint: '', points: 10
+      });
+    }
+    setIsLevelModalOpen(true);
+  };
+
+  const saveLevel = async () => {
+    if (!currentLevel.question || !currentLevel.answer || currentLevel.options.some(o => !o)) {
+      toast.error('Question, Answer, and all Options are required');
+      return;
+    }
+    try {
+      const category = categories.find(c => c.slug === activeCategorySlug);
+      let newLevels = [...category.levels];
+      
+      if (isEditingLevel) {
+        const idx = newLevels.findIndex(l => l.level === currentLevel.level);
+        if (idx !== -1) newLevels[idx] = currentLevel;
+      } else {
+        newLevels.push(currentLevel);
+      }
+
+      const updatedCategory = { ...category, levels: newLevels };
+      const res = await quizAPI.updateCategory(category.slug, updatedCategory);
+      
+      setCategories(categories.map(c => c.slug === category.slug ? res.data : c));
+      toast.success('Level saved successfully');
+      setIsLevelModalOpen(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save level');
+    }
+  };
+
+  const deleteLevel = async (categorySlug, levelNumber) => {
+    if (!window.confirm(`Are you sure you want to delete level ${levelNumber}?`)) return;
+    try {
+      const category = categories.find(c => c.slug === categorySlug);
+      const newLevels = category.levels.filter(l => l.level !== levelNumber);
+      newLevels.forEach((l, idx) => l.level = idx + 1);
+
+      const updatedCategory = { ...category, levels: newLevels };
+      const res = await quizAPI.updateCategory(category.slug, updatedCategory);
+      
+      setCategories(categories.map(c => c.slug === category.slug ? res.data : c));
+      toast.success('Level deleted');
+    } catch (err) {
+      toast.error('Failed to delete level');
     }
   };
 
   if (isLoading) {
-    return <div style={{ color: '#fff', padding: '40px', textAlign: 'center' }}>Loading Admin Panel...</div>;
+    return <div className="admin-loading">Loading Admin Portal...</div>;
   }
 
+  const groupedCategories = categories.reduce((acc, cat) => {
+    const parent = cat.parentCategory || 'Root Categories';
+    if (!acc[parent]) acc[parent] = [];
+    acc[parent].push(cat);
+    return acc;
+  }, {});
+
   return (
-    <div style={{ minHeight: '100vh', background: '#0f172a', padding: '40px 20px', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-        
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <button onClick={() => navigate('/')} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <FaArrowLeft />
-            </button>
-            <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
-              <FaCog style={{ color: '#6366f1' }} /> Admin Panel
-            </h1>
-          </div>
-          <button onClick={() => openModal()} style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.4)' }}>
-            <FaPlus /> Add Section
+    <div className="admin-portal-container">
+      <div className="admin-header">
+        <div className="admin-header-content">
+          <button onClick={() => navigate('/')} className="admin-back-btn">
+            <FaArrowLeft /> Back to Home
           </button>
+          <h1><FaCog style={{ color: '#2563EB' }} /> Admin Portal</h1>
         </div>
-
-        <div style={{ background: 'rgba(30,41,59,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', overflow: 'hidden' }}>
-          <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.6)' }}>
-            <h2 style={{ fontSize: '1.2rem', color: '#e2e8f0', margin: 0, fontWeight: 700 }}>Resume Sections Manager</h2>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '4px', marginBottom: 0 }}>Drag and drop to reorder. Toggle status to hide/show in the Resume Builder.</p>
-          </div>
-          
-          <div style={{ padding: '20px' }}>
-            {sections.map((sec, index) => (
-              <div
-                key={sec._id || sec.key}
-                draggable
-                onDragStart={(e) => handleDragStart(e, index)}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDragEnd={handleDragEnd}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '16px', padding: '16px',
-                  background: draggedItemIndex === index ? 'rgba(99,102,241,0.2)' : 'rgba(15,23,42,0.8)',
-                  border: `1px solid ${draggedItemIndex === index ? '#6366f1' : 'rgba(255,255,255,0.08)'}`,
-                  borderRadius: '12px', marginBottom: '12px', cursor: 'grab',
-                  opacity: sec.isActive ? 1 : 0.6,
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <div style={{ color: '#64748b', cursor: 'grab' }}><FaGripVertical /></div>
-                
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '1.1rem', fontWeight: 700, color: sec.isActive ? '#e2e8f0' : '#94a3b8' }}>{sec.name}</span>
-                    <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', color: '#cbd5e1' }}>{sec.key}</span>
-                    {sec.isRequired && <span style={{ fontSize: '0.7rem', background: 'rgba(239,68,68,0.2)', color: '#ef4444', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>Required</span>}
-                    {sec.allowMultiple && <span style={{ fontSize: '0.7rem', background: 'rgba(16,185,129,0.2)', color: '#10b981', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>Multiple</span>}
-                  </div>
-                  <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{sec.description || 'No description provided.'}</div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <button onClick={() => toggleStatus(sec)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.4rem', color: sec.isActive ? '#10b981' : '#64748b' }}>
-                    {sec.isActive ? <FaCheckCircle /> : <FaTimesCircle />}
-                  </button>
-                  <button onClick={() => openModal(sec)} style={{ background: 'rgba(99,102,241,0.2)', border: 'none', color: '#818cf8', padding: '8px', borderRadius: '8px', cursor: 'pointer' }}>
-                    <FaEdit />
-                  </button>
-                  <button onClick={() => handleDelete(sec)} style={{ background: 'rgba(239,68,68,0.2)', border: 'none', color: '#f87171', padding: '8px', borderRadius: '8px', cursor: 'pointer' }}>
-                    <FaTrash />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <button onClick={() => openCategoryModal()} className="admin-add-btn">
+          <FaPlus /> Add Category
+        </button>
       </div>
 
-      {/* Modal */}
-      {isModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', width: '100%', maxWidth: '500px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#f1f5f9', fontWeight: 700 }}>{isEditing ? 'Edit Section' : 'Add Custom Section'}</h3>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem' }}><FaTimes /></button>
+      <div className="admin-content">
+        {Object.keys(groupedCategories).map((parentName) => (
+          <div key={parentName} className="admin-category-group">
+            <h2 className="admin-group-title"><FaFolder /> {parentName}</h2>
+            <div className="admin-grid">
+              {groupedCategories[parentName].map(cat => (
+                <div key={cat.slug} className="admin-card">
+                  <div className="admin-card-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span className="admin-badge" style={{ backgroundColor: cat.color, color: cat.iconColor }}>{cat.label}</span>
+                      <h3>{cat.name}</h3>
+                    </div>
+                    <div className="admin-actions">
+                      <button onClick={() => openCategoryModal(cat)} className="btn-icon edit"><FaEdit /></button>
+                      <button onClick={() => deleteCategory(cat.slug)} className="btn-icon delete"><FaTrash /></button>
+                    </div>
+                  </div>
+                  <p className="admin-desc">{cat.description}</p>
+                  
+                  <div className="admin-levels">
+                    <div className="admin-levels-header">
+                      <h4>Levels ({cat.levels.length})</h4>
+                      <button onClick={() => openLevelModal(cat.slug)} className="btn-small"><FaPlus /> Add Level</button>
+                    </div>
+                    {cat.levels.length === 0 && <p className="no-data">No levels added yet.</p>}
+                    <ul className="admin-level-list">
+                      {cat.levels.map(lvl => (
+                        <li key={lvl.level} className="admin-level-item">
+                          <div className="lvl-info">
+                            <strong>Level {lvl.level}:</strong> {lvl.question}
+                            <span className="lvl-points">{lvl.points} pts</span>
+                          </div>
+                          <div className="lvl-actions">
+                            <button onClick={() => openLevelModal(cat.slug, lvl)} className="btn-icon-small edit"><FaEdit /></button>
+                            <button onClick={() => deleteLevel(cat.slug, lvl.level)} className="btn-icon-small delete"><FaTrash /></button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ))}
             </div>
-            
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Section Name</label>
-                <input value={currentSection.name} onChange={e => setCurrentSection({...currentSection, name: e.target.value})} type="text" placeholder="e.g., Portfolio" style={{ width: '100%', background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px', borderRadius: '8px', color: '#f1f5f9', outline: 'none' }} />
-              </div>
-              
-              <div>
-                <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Unique Key (no spaces)</label>
-                <input value={currentSection.key} onChange={e => setCurrentSection({...currentSection, key: e.target.value.toLowerCase().replace(/\s/g, '')})} type="text" placeholder="e.g., portfolio" style={{ width: '100%', background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px', borderRadius: '8px', color: '#f1f5f9', outline: 'none' }} />
-              </div>
+          </div>
+        ))}
+      </div>
 
-              <div>
-                <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Description</label>
-                <textarea value={currentSection.description} onChange={e => setCurrentSection({...currentSection, description: e.target.value})} placeholder="What goes in this section?" rows={3} style={{ width: '100%', background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px', borderRadius: '8px', color: '#f1f5f9', outline: 'none', resize: 'none' }} />
-              </div>
+      {isCategoryModalOpen && (
+        <div className="admin-modal-overlay">
+          <div className="admin-modal">
+            <div className="admin-modal-header">
+              <h3>{isEditingCategory ? 'Edit Category' : 'Add Category'}</h3>
+              <button onClick={() => setIsCategoryModalOpen(false)} className="close-btn"><FaTimes /></button>
+            </div>
+            <div className="admin-modal-body">
+              <label>Name</label>
+              <input value={currentCategory.name} onChange={e => setCurrentCategory({...currentCategory, name: e.target.value})} placeholder="e.g. Java Basics" />
               
-              <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#cbd5e1', fontSize: '0.9rem', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={currentSection.isRequired} onChange={e => setCurrentSection({...currentSection, isRequired: e.target.checked})} style={{ accentColor: '#6366f1' }} />
-                  Required Section
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#cbd5e1', fontSize: '0.9rem', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={currentSection.allowMultiple} onChange={e => setCurrentSection({...currentSection, allowMultiple: e.target.checked})} style={{ accentColor: '#10b981' }} />
-                  Allow Multiple Entries
-                </label>
+              <label>Slug (Unique ID)</label>
+              <input value={currentCategory.slug} onChange={e => setCurrentCategory({...currentCategory, slug: e.target.value.toLowerCase().replace(/\s/g, '-')})} placeholder="e.g. java-basics" disabled={isEditingCategory} />
+              
+              <label>Parent Category</label>
+              <input value={currentCategory.parentCategory} onChange={e => setCurrentCategory({...currentCategory, parentCategory: e.target.value})} placeholder="e.g. Programming (Leave empty for root)" />
+              
+              <label>Description</label>
+              <textarea value={currentCategory.description} onChange={e => setCurrentCategory({...currentCategory, description: e.target.value})} placeholder="Brief description of this category"></textarea>
+              
+              <div className="input-row">
+                <div>
+                  <label>Label</label>
+                  <input value={currentCategory.label} onChange={e => setCurrentCategory({...currentCategory, label: e.target.value})} placeholder="e.g. JAVA" />
+                </div>
+                <div>
+                  <label>Background Color</label>
+                  <input type="color" value={currentCategory.color} onChange={e => setCurrentCategory({...currentCategory, color: e.target.value})} />
+                </div>
+                <div>
+                  <label>Icon Color</label>
+                  <input type="color" value={currentCategory.iconColor} onChange={e => setCurrentCategory({...currentCategory, iconColor: e.target.value})} />
+                </div>
               </div>
             </div>
+            <div className="admin-modal-footer">
+              <button onClick={() => setIsCategoryModalOpen(false)} className="btn-secondary">Cancel</button>
+              <button onClick={saveCategory} className="btn-primary"><FaSave /> Save Category</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-            <div style={{ padding: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.4)', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={saveSection} style={{ background: '#6366f1', border: 'none', color: '#fff', padding: '10px 20px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><FaSave /> Save Section</button>
+      {isLevelModalOpen && (
+        <div className="admin-modal-overlay">
+          <div className="admin-modal modal-large">
+            <div className="admin-modal-header">
+              <h3>{isEditingLevel ? `Edit Level ${currentLevel.level}` : 'Add New Level'}</h3>
+              <button onClick={() => setIsLevelModalOpen(false)} className="close-btn"><FaTimes /></button>
+            </div>
+            <div className="admin-modal-body">
+              <label>Level Number</label>
+              <input type="number" value={currentLevel.level} onChange={e => setCurrentLevel({...currentLevel, level: parseInt(e.target.value)})} disabled={isEditingLevel} />
+              
+              <label>Points</label>
+              <input type="number" value={currentLevel.points} onChange={e => setCurrentLevel({...currentLevel, points: parseInt(e.target.value)})} />
+              
+              <label>Question</label>
+              <textarea value={currentLevel.question} onChange={e => setCurrentLevel({...currentLevel, question: e.target.value})} rows="3"></textarea>
+              
+              <label>Options (4)</label>
+              {currentLevel.options.map((opt, idx) => (
+                <input 
+                  key={idx} 
+                  value={opt} 
+                  onChange={e => {
+                    const newOptions = [...currentLevel.options];
+                    newOptions[idx] = e.target.value;
+                    setCurrentLevel({...currentLevel, options: newOptions});
+                  }} 
+                  placeholder={`Option ${idx + 1}`} 
+                  style={{ marginBottom: '8px' }}
+                />
+              ))}
+
+              <label>Correct Answer (Must exactly match one option)</label>
+              <input value={currentLevel.answer} onChange={e => setCurrentLevel({...currentLevel, answer: e.target.value})} />
+
+              <label>Hint</label>
+              <input value={currentLevel.hint} onChange={e => setCurrentLevel({...currentLevel, hint: e.target.value})} />
+            </div>
+            <div className="admin-modal-footer">
+              <button onClick={() => setIsLevelModalOpen(false)} className="btn-secondary">Cancel</button>
+              <button onClick={saveLevel} className="btn-primary"><FaSave /> Save Level</button>
             </div>
           </div>
         </div>
