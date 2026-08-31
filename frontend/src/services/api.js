@@ -9,6 +9,29 @@ const api = axios.create({
   },
 });
 
+api.interceptors.request.use((config) => {
+  const saved = localStorage.getItem("trivia_progress");
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      if (data.token) {
+        config.headers.Authorization = `Bearer ${data.token}`;
+      }
+    } catch (e) {}
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      window.dispatchEvent(new Event('jwt-expired'));
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Authentication Operations
 export const authAPI = {
   login: (data) => api.post('/auth/login', data),

@@ -6,6 +6,7 @@ const UserProgressContext = createContext();
 
 const initialProgressState = {
   userId: null,
+  token: null,
   username: null,
   email: '',
   profilePhoto: '',
@@ -100,6 +101,15 @@ export function UserProgressProvider({ children }) {
     syncWithServer();
   }, [progress]);
 
+  useEffect(() => {
+    const handleJwtExpired = () => {
+      logoutUser();
+      toast.error('Session expired. Please log in again.');
+    };
+    window.addEventListener('jwt-expired', handleJwtExpired);
+    return () => window.removeEventListener('jwt-expired', handleJwtExpired);
+  }, []);
+
   // Load global leaderboard on mount or when requested
   const fetchGlobalLeaderboard = async () => {
     setIsLoading(true);
@@ -124,10 +134,12 @@ export function UserProgressProvider({ children }) {
       const response = await authAPI.signup({ username, email, password });
       const user = response.data;
       const userId = user.userId;
+      const token = user.token;
 
       const finalProgress = {
         ...initialProgressState,
         userId: userId,
+        token: token,
         username: username
       };
 
@@ -173,6 +185,7 @@ export function UserProgressProvider({ children }) {
       const response = await authAPI.login({ username, password });
       const user = response.data;
       const userId = user.userId;
+      const token = user.token;
 
       // Fetch user's saved progress from MongoDB
       const progressRes = await userProgressAPI.getProgress(userId);
@@ -181,6 +194,7 @@ export function UserProgressProvider({ children }) {
       let finalProgress = {
         ...initialProgressState,
         userId: userId,
+        token: token,
         username: username
       };
 

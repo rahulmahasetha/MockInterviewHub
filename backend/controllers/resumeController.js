@@ -16,7 +16,8 @@ const uploadResume = async (req, res) => {
     await runResumeUpload(req, res);
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     filePath = req.file.path;
-    const { userId } = req.body;
+    const userId = req.user.userId;
+    req.body.userId = userId;
     if (!userId) return res.status(400).json({ error: 'userId is required' });
 
     const dataBuffer = fs.readFileSync(filePath);
@@ -129,7 +130,7 @@ ${rawText.substring(0, 25000)}
 };
 
 const getResume = async (req, res) => {
-  const { userId } = req.params;
+  const userId = req.user.userId;
   if (getIsMongoDBConnected()) {
     try {
       const data = await ResumeData.findOne({ userId });
@@ -147,7 +148,8 @@ const getResume = async (req, res) => {
 };
 
 const generateQuestions = async (req, res) => {
-  const { userId, resumeText, difficulty, categories, countPerCategory } = req.body;
+  const { resumeText, difficulty, categories, countPerCategory } = req.body;
+  const userId = req.user.userId;
   if (!resumeText) return res.status(400).json({ error: 'Resume text is required' });
 
   const safeCategories = Array.isArray(categories) && categories.length > 0
@@ -230,7 +232,8 @@ Return ONLY a JSON array with this structure:
 };
 
 const followUp = async (req, res) => {
-  const { userId, resumeText, currentQuestion, userAnswer } = req.body;
+  const { resumeText, currentQuestion, userAnswer } = req.body;
+  const userId = req.user.userId;
   const fallbackFollowUp = { question: "Can you give a concrete example from your resume that supports your answer?", idealAnswer: "A strong answer should cite a specific resume item and explain the impact clearly." };
 
   if (!hasGeminiKey() && !hasXAIKey()) {
@@ -392,6 +395,8 @@ Return ONLY JSON:
 
 const saveSession = async (req, res) => {
   const entry = req.body;
+  const userId = req.user.userId;
+  entry.userId = userId;
   if (!entry.userId) return res.status(400).json({ error: 'userId is required' });
 
   if (getIsMongoDBConnected()) {
@@ -413,7 +418,7 @@ const saveSession = async (req, res) => {
 };
 
 const getSessionHistory = async (req, res) => {
-  const { userId } = req.params;
+  const userId = req.user.userId;
   if (getIsMongoDBConnected()) {
     try {
       const results = await ResumeInterview.find({ userId }).sort({ date: -1 }).limit(20);
@@ -429,7 +434,8 @@ const getSessionHistory = async (req, res) => {
 };
 
 const proctorViolation = async (req, res) => {
-  const { userId, eventType } = req.body;
+  const { eventType } = req.body;
+  const userId = req.user.userId;
   console.log(`Proctoring violation logged for ${userId}: ${eventType}`);
   res.json({ success: true });
 };

@@ -1,16 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const { uploadResume, getResume, generateQuestions, followUp, evaluateAnswer, detectAI, finalReport, saveSession, getSessionHistory, proctorViolation } = require('../controllers/resumeController');
+const { verifyToken } = require('../middleware/authMiddleware');
 
-router.post('/upload', uploadResume);
-router.get('/:userId', getResume);
-router.post('/generate-questions', generateQuestions);
-router.post('/follow-up', followUp);
-router.post('/evaluate-answer', evaluateAnswer);
-router.post('/detect-ai', detectAI);
-router.post('/final-report', finalReport);
-router.post('/save-session', saveSession);
-router.get('/history/:userId', getSessionHistory);
-router.post('/proctor-violation', proctorViolation);
+router.post('/upload', verifyToken, uploadResume);
+router.get('/:userId', verifyToken, getResume);
+router.post('/generate-questions', verifyToken, generateQuestions);
+router.post('/follow-up', verifyToken, followUp);
+router.post('/evaluate-answer', verifyToken, evaluateAnswer);
+router.post('/detect-ai', verifyToken, detectAI);
+router.post('/final-report', verifyToken, finalReport);
+router.post('/save-session', verifyToken, saveSession);
+router.get('/history/:userId', verifyToken, getSessionHistory);
+router.post('/proctor-violation', verifyToken, proctorViolation);
 
 module.exports = router;

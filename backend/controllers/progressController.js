@@ -4,7 +4,7 @@ const { getIsMongoDBConnected } = require('../config/db');
 const { readFallbackData, writeFallbackData } = require('../utils/dbFallback');
 
 const getProgress = async (req, res) => {
-  const { userId } = req.query;
+  const userId = req.user.userId;
   if (getIsMongoDBConnected()) {
     try {
       if (userId) {
@@ -28,7 +28,8 @@ const getProgress = async (req, res) => {
 };
 
 const createProgress = async (req, res) => {
-  const { userId } = req.body;
+  const userId = req.user.userId;
+  req.body.userId = userId;
   if (!userId) return res.status(400).json({ error: 'userId is required' });
 
   if (getIsMongoDBConnected()) {
@@ -54,6 +55,7 @@ const createProgress = async (req, res) => {
 
 const updateProgress = async (req, res) => {
   const { id } = req.params;
+  const userId = req.user.userId;
   if (getIsMongoDBConnected()) {
     try {
       let updatedProgress;

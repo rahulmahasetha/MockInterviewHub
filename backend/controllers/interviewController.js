@@ -160,7 +160,8 @@ const evaluateInterview = async (req, res) => {
 };
 
 const saveInterview = async (req, res) => {
-  const { userId, topic, overallScore, communicationScore, technicalScore, confidenceScore, feedbackSummary, strengths, areasForImprovement, questionCount } = req.body;
+  const { topic, overallScore, communicationScore, technicalScore, confidenceScore, feedbackSummary, strengths, areasForImprovement, questionCount } = req.body;
+  const userId = req.user.userId;
   if (!userId) return res.status(400).json({ error: 'userId is required' });
 
   const entry = {
@@ -190,7 +191,7 @@ const saveInterview = async (req, res) => {
 };
 
 const getInterviewHistory = async (req, res) => {
-  const { userId } = req.params;
+  const userId = req.user.userId;
   if (getIsMongoDBConnected()) {
     try {
       const results = await InterviewResult.find({ userId }).sort({ date: -1 }).limit(50);

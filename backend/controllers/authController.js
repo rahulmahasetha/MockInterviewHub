@@ -1,4 +1,6 @@
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { JWT_SECRET } = require('../middleware/authMiddleware');
 const User = require('../models/User');
 const Progress = require('../models/Progress');
 const { getIsMongoDBConnected } = require('../config/db');
@@ -32,7 +34,8 @@ const signup = async (req, res) => {
       });
       await newProgress.save();
 
-      res.status(201).json({ success: true, userId: newUser._id.toString(), username: newUser.username });
+      const token = jwt.sign({ userId: newUser._id.toString() }, JWT_SECRET, { expiresIn: '7d' });
+      res.status(201).json({ success: true, token, userId: newUser._id.toString(), username: newUser.username });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -57,7 +60,8 @@ const signup = async (req, res) => {
     };
     data.progress.push(newProgress);
     writeFallbackData(data);
-    res.status(201).json({ success: true, userId, username });
+    const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+    res.status(201).json({ success: true, token, userId, username });
   }
 };
 
@@ -73,7 +77,8 @@ const login = async (req, res) => {
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) return res.status(400).json({ error: 'Invalid username or password' });
 
-      res.json({ success: true, userId: user._id.toString(), username: user.username });
+      const token = jwt.sign({ userId: user._id.toString() }, JWT_SECRET, { expiresIn: '7d' });
+      res.json({ success: true, token, userId: user._id.toString(), username: user.username });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -81,7 +86,8 @@ const login = async (req, res) => {
     const data = readFallbackData();
     const user = data.users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
     if (!user) return res.status(400).json({ error: 'Invalid username or password' });
-    res.json({ success: true, userId: user.id, username: user.username });
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ success: true, token, userId: user.id, username: user.username });
   }
 };
 
@@ -110,7 +116,8 @@ const forgotPassword = async (req, res) => {
 };
 
 const updateProfile = async (req, res) => {
-  const { userId, email, currentPassword, newPassword, profilePhoto, fullName, collegeName, branch, year, bio } = req.body;
+  const { email, currentPassword, newPassword, profilePhoto, fullName, collegeName, branch, year, bio } = req.body;
+  const userId = req.user.userId;
   if (!userId) return res.status(400).json({ error: 'userId is required' });
   if (email && !/^[a-zA-Z0-9._%+-]+@gmail\\.com$/i.test(email)) {
     return res.status(400).json({ error: 'Only valid Gmail addresses are allowed (e.g., name@gmail.com).' });
@@ -168,7 +175,7 @@ const updateProfile = async (req, res) => {
 };
 
 const getProfile = async (req, res) => {
-  const { userId } = req.params;
+  const userId = req.user.userId;
   if (getIsMongoDBConnected()) {
     try {
       const user = await User.findById(userId).select('-password');
