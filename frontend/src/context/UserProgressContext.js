@@ -187,6 +187,10 @@ export function UserProgressProvider({ children }) {
       const userId = user.userId;
       const token = user.token;
 
+      // Save token to localStorage immediately so that interceptors have it for the next requests
+      const tempProgress = { ...progress, userId, token, username };
+      localStorage.setItem("trivia_progress", JSON.stringify(tempProgress));
+
       // Fetch user's saved progress from MongoDB
       const progressRes = await userProgressAPI.getProgress(userId);
       const dbProgressList = progressRes.data || [];
