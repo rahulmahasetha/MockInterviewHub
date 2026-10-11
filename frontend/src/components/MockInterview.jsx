@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { interviewAPI, leaderboardAPI } from '../services/api';
 import { useUserProgress } from '../context/UserProgressContext';
-import { FaRobot, FaArrowLeft, FaCheckCircle, FaSpinner, FaMicrophone, FaStop } from 'react-icons/fa';
+import { FaRobot, FaArrowLeft, FaCheckCircle, FaSpinner, FaMicrophone, FaStop, FaHistory, FaChartBar } from 'react-icons/fa';
 import PreInterviewCheck from './PreInterviewCheck';
 import MiniProctoring from './MiniProctoring';
 
@@ -24,6 +24,8 @@ export default function MockInterview() {
   const [interviewMode, setInterviewMode] = useState('written'); // 'written' or 'speaking'
   const [violations, setViolations] = useState(0);
   const [passedPreCheck, setPassedPreCheck] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const recognitionRef = useRef(null);
 
   useEffect(() => {
@@ -221,6 +223,26 @@ export default function MockInterview() {
     setViolations(0);
   };
 
+  const loadHistory = async () => {
+    if (!progress?.userId) {
+      alert("Please log in to view your interview history.");
+      return;
+    }
+    setIsLoadingHistory(true);
+    try {
+      const res = await interviewAPI.getHistory(progress.userId);
+      if (res.data?.success) {
+        setHistory(res.data.results || []);
+        setStep('history');
+      }
+    } catch (err) {
+      console.error("Failed to load interview history", err);
+      alert("Could not load interview history.");
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
   if (!passedPreCheck) {
     return <PreInterviewCheck onComplete={() => setPassedPreCheck(true)} />;
   }
@@ -280,6 +302,31 @@ export default function MockInterview() {
             <button className="auth-submit-btn" onClick={handleStart} disabled={isLoading} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
               {isLoading ? <><FaSpinner className="fa-spin" /> Generating Questions...</> : 'Start Interview'}
             </button>
+
+            <div style={{ textAlign: 'center', marginTop: '20px' }}>
+              <button 
+                type="button" 
+                onClick={loadHistory} 
+                disabled={isLoadingHistory}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: '#2563eb', 
+                  cursor: isLoadingHistory ? 'not-allowed' : 'pointer', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  fontWeight: 600, 
+                  fontSize: '0.95rem' 
+                }}
+              >
+                {isLoadingHistory ? (
+                  <><FaSpinner className="fa-spin" /> Loading History...</>
+                ) : (
+                  <><FaHistory /> View Past Interviews</>
+                )}
+              </button>
+            </div>
           </div>
         )}
 
@@ -378,9 +425,12 @@ export default function MockInterview() {
               )}
               <p style={{ color: '#64748b', marginTop: '10px' }}>Review your answers compared to the ideal responses below.</p>
               
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '25px' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '25px', flexWrap: 'wrap' }}>
                 <button className="auth-submit-btn" onClick={resetInterview} style={{ width: 'auto', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>
                   Take Another Interview
+                </button>
+                <button className="auth-submit-btn" onClick={loadHistory} style={{ width: 'auto', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                  View History
                 </button>
                 <button className="auth-submit-btn" onClick={() => navigate('/')} style={{ width: 'auto' }}>
                   Return to Dashboard
@@ -430,6 +480,110 @@ export default function MockInterview() {
                 </div>
               )})}
             </div>
+          </div>
+        )}
+
+        {/* HISTORY STEP */}
+        {step === 'history' && (
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <button 
+              onClick={() => setStep('setup')} 
+              style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', fontWeight: 600 }}
+            >
+              <FaArrowLeft /> Back to Setup
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '10px' }}>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <FaHistory style={{ color: '#2563eb' }} /> Past Technical Interviews
+              </h2>
+              <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>
+                {history.length} {history.length === 1 ? 'Session' : 'Sessions'} Recorded
+              </span>
+            </div>
+
+            {history.length === 0 ? (
+              <div className="auth-card" style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
+                <FaChartBar style={{ fontSize: '3rem', marginBottom: '16px', opacity: 0.3, color: '#3b82f6' }} />
+                <h3 style={{ margin: '0 0 8px 0', color: '#1e293b' }}>No past interviews found</h3>
+                <p style={{ margin: 0 }}>Complete an interview session to see your performance history and analytics here.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {history.map((h, i) => (
+                  <div key={i} className="auth-card" style={{ padding: '22px 26px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>{h.topic || 'General'}</h3>
+                          <span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '0.78rem', fontWeight: 600 }}>
+                            {h.questionCount ? `${h.questionCount} Questions` : 'Mock Session'}
+                          </span>
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '4px' }}>
+                          {new Date(h.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '1.75rem', fontWeight: 800, color: h.overallScore >= 80 ? '#16a34a' : h.overallScore >= 60 ? '#ca8a04' : '#dc2626' }}>
+                          {h.overallScore}%
+                        </div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Overall Score</div>
+                      </div>
+                    </div>
+
+                    {/* Breakdown metrics */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', background: '#f8fafc', padding: '12px 16px', borderRadius: '8px', marginBottom: '14px' }}>
+                      <div>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Technical</span>
+                        <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '1.05rem' }}>{h.technicalScore ?? 'N/A'}%</div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Communication</span>
+                        <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '1.05rem' }}>{h.communicationScore ?? 'N/A'}%</div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Confidence</span>
+                        <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '1.05rem' }}>{h.confidenceScore ?? 'N/A'}%</div>
+                      </div>
+                    </div>
+
+                    {/* Feedback summary */}
+                    {h.feedbackSummary && (
+                      <p style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#334155', lineHeight: 1.5 }}>
+                        {h.feedbackSummary}
+                      </p>
+                    )}
+
+                    {/* Strengths & Improvements */}
+                    {((h.strengths && h.strengths.length > 0) || (h.areasForImprovement && h.areasForImprovement.length > 0)) && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
+                        {h.strengths && h.strengths.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803d' }}>Strengths:</span>
+                            {h.strengths.map((s, idx) => (
+                              <span key={idx} style={{ background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 500 }}>
+                                {s}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {h.areasForImprovement && h.areasForImprovement.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b45309' }}>Improve:</span>
+                            {h.areasForImprovement.map((imp, idx) => (
+                              <span key={idx} style={{ background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 500 }}>
+                                {imp}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

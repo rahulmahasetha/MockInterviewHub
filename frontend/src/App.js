@@ -10,6 +10,7 @@ import MockInterview from './components/MockInterview';
 import ResumeAI from './components/ResumeAI';
 import AdminPanel from './components/AdminPanel';
 import ResumeBuilder from './components/ResumeBuilder';
+import Dashboard from './components/Dashboard';
 import { UserProgressProvider } from './context/UserProgressContext';
 
 export default function App() {
@@ -28,6 +29,7 @@ export default function App() {
       />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/playground/:category" element={<Playground />} />
         <Route path="/summary" element={<ScoreSummary />} />
         <Route path="/leaderboard" element={<Leaderboard />} />

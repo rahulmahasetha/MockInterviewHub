@@ -62,22 +62,38 @@ const splitSections = (text) => {
   return sections;
 };
 
+const emptySection = () => ({
+  skills: [],
+  experience: [],
+  projects: [],
+  education: [],
+  certifications: [],
+  achievements: [],
+  technologies: [],
+  publications: []
+});
+
 const parseResumeFallback = (text) => {
-  const sections = splitSections(text);
+  const rawSections = splitSections(text);
+  // splitSections returns [] for empty/null input — fall back to empty section object
+  const sections = Array.isArray(rawSections) ? emptySection() : rawSections;
   
   // Combine skills and technologies sections into a single set of unique skills
   const combinedSkills = [...new Set([...sections.skills, ...sections.technologies])];
 
+  // Normalize to avoid calling .match() or .split() on null/undefined
+  const safeText = String(text || '');
+
   // Try to find email and phone
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
   const phoneRegex = /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
-  const emailMatch = text.match(emailRegex);
-  const phoneMatch = text.match(phoneRegex);
+  const emailMatch = safeText.match(emailRegex);
+  const phoneMatch = safeText.match(phoneRegex);
   const email = emailMatch ? emailMatch[0] : '';
   const phone = phoneMatch ? phoneMatch[0] : '';
 
   // Name is typically in the first few lines
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const lines = safeText.split('\n').map(l => l.trim()).filter(Boolean);
   let name = '';
   for (const l of lines.slice(0, 5)) {
     if (!l.includes('@') && !l.match(/\d{4,}/) && l.length < 40) {
