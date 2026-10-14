@@ -1,4 +1,4 @@
-const { parseResumeFallback } = require('../utils/resumeParser');
+const { parseResumeFallback, analyzeAtsFallback } = require('../utils/resumeParser');
 
 describe('parseResumeFallback', () => {
   const sampleResume = `
@@ -105,3 +105,76 @@ Technologies
     expect(jsCounts).toBe(1);
   });
 });
+
+describe('analyzeAtsFallback', () => {
+  const sampleResume = `
+Jane Developer
+jane.dev@example.com
++1 (555) 987-6543
+
+Summary
+Results-driven Full Stack Engineer with 4+ years of experience building scalable web applications.
+
+Skills
+JavaScript, TypeScript, React, Node.js, Express, MongoDB, SQL, Git, REST, HTML5, CSS3
+
+Experience
+Senior Software Engineer at TechCorp (2021 - Present)
+- Architected REST microservices in Node.js and React, increasing throughput by 45% for 50k users.
+- Optimized PostgreSQL queries, cutting API latency by 35ms across production endpoints.
+
+Projects
+E-Commerce Cloud Platform
+- Developed full-stack shopping portal with React, Redux, and Node.js.
+- Deployed automated CI/CD pipeline using Git and Docker, cutting deployment time by 50%.
+
+Education
+B.Tech in Information Technology, State University (2017 - 2021)
+`;
+
+  test('computes an ATS score and returns all expected breakdown metrics', () => {
+    const analysis = analyzeAtsFallback(sampleResume, 'Looking for React, Node.js, and Docker developer');
+    expect(analysis).toHaveProperty('atsScore');
+    expect(analysis.atsScore).toBeGreaterThanOrEqual(40);
+    expect(analysis.atsScore).toBeLessThanOrEqual(100);
+    expect(analysis).toHaveProperty('scoreBreakdown');
+    expect(analysis.scoreBreakdown).toHaveProperty('keywordsMatch');
+    expect(analysis.scoreBreakdown).toHaveProperty('formattingAndStructure');
+    expect(analysis.scoreBreakdown).toHaveProperty('quantifiableImpact');
+    expect(analysis.scoreBreakdown).toHaveProperty('experienceRelevance');
+  });
+
+  test('accurately identifies matched and missing keywords against a Job Description', () => {
+    const jd = 'Must have React, Node.js, Docker, Kubernetes, AWS, and GraphQL.';
+    const analysis = analyzeAtsFallback(sampleResume, jd);
+    expect(analysis.matchedKeywords).toContain('React');
+    expect(analysis.matchedKeywords).toContain('Node.js');
+    expect(analysis.matchedKeywords).toContain('Docker');
+    expect(analysis.missingKeywords).toContain('Kubernetes');
+    expect(analysis.missingKeywords).toContain('AWS');
+  });
+
+  test('generates actionable bullet point improvements with the XYZ formula', () => {
+    const analysis = analyzeAtsFallback(sampleResume);
+    expect(Array.isArray(analysis.bulletPointImprovements)).toBe(true);
+    expect(analysis.bulletPointImprovements.length).toBeGreaterThan(0);
+    expect(analysis.bulletPointImprovements[0]).toHaveProperty('original');
+    expect(analysis.bulletPointImprovements[0]).toHaveProperty('improved');
+    expect(analysis.bulletPointImprovements[0]).toHaveProperty('reason');
+  });
+
+  test('identifies strengths and weaknesses', () => {
+    const analysis = analyzeAtsFallback(sampleResume);
+    expect(Array.isArray(analysis.strengths)).toBe(true);
+    expect(analysis.strengths.length).toBeGreaterThan(0);
+    expect(Array.isArray(analysis.weaknesses)).toBe(true);
+  });
+
+  test('handles brief or empty resumes gracefully without throwing errors', () => {
+    const analysis = analyzeAtsFallback('');
+    expect(analysis).toHaveProperty('atsScore');
+    expect(analysis.atsScore).toBeGreaterThanOrEqual(0);
+    expect(analysis.formattingIssues.length).toBeGreaterThan(0);
+  });
+});
+

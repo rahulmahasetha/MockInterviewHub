@@ -89,6 +89,7 @@ export const resumeAPI = {
       : {};
     return api.post('/api/resume/upload', data, config);
   },
+  analyzeATS: (data) => api.post('/api/resume/analyze', data),
   getResumeData: (userId) => api.get(`/api/resume/${userId}`),
   generateQuestions: (data) => api.post('/api/resume/generate-questions', data),
   generateFollowUp: (data) => api.post('/api/resume/follow-up', data),

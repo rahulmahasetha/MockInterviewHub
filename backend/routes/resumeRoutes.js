@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { uploadResume, getResume, generateQuestions, followUp, evaluateAnswer, detectAI, finalReport, saveSession, getSessionHistory, proctorViolation } = require('../controllers/resumeController');
+const { uploadResume, getResume, generateQuestions, followUp, evaluateAnswer, detectAI, finalReport, saveSession, getSessionHistory, proctorViolation, analyzeResumeATS } = require('../controllers/resumeController');
 const { verifyToken } = require('../middleware/authMiddleware');
 
 router.post('/upload', verifyToken, uploadResume);
+router.post('/analyze', verifyToken, analyzeResumeATS);
 router.get('/:userId', verifyToken, getResume);
 router.post('/generate-questions', verifyToken, generateQuestions);
 router.post('/follow-up', verifyToken, followUp);

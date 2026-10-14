@@ -5,7 +5,7 @@ const { getIsMongoDBConnected } = require('../config/db');
 const { readFallbackData, writeFallbackData } = require('../utils/dbFallback');
 const { runResumeUpload } = require('../config/multer');
 const { extractResumeText, cleanupUploadedFile } = require('../utils/fileUtils');
-const { parseResumeFallback } = require('../utils/resumeParser');
+const { parseResumeFallback, analyzeAtsFallback } = require('../utils/resumeParser');
 const { hasGeminiKey, hasXAIKey, callGeminiChat, callXAIChat, parseAiJsonSafely } = require('../utils/ai');
 const { RAGEngine } = require('../utils/ragEngine');
 const { buildFallbackQuestions } = require('../utils/helpers');
@@ -440,4 +440,104 @@ const proctorViolation = async (req, res) => {
   res.json({ success: true });
 };
 
-module.exports = { uploadResume, getResume, generateQuestions, followUp, evaluateAnswer, detectAI, finalReport, saveSession, getSessionHistory, proctorViolation };
+const analyzeResumeATS = async (req, res) => {
+  try {
+    const { resumeText, jobDescription = '', targetRole = '' } = req.body;
+    const userId = req.user?.userId;
+
+    let textToAnalyze = resumeText;
+    if (!textToAnalyze && userId) {
+      if (getIsMongoDBConnected()) {
+        const doc = await ResumeData.findOne({ userId });
+        textToAnalyze = doc?.rawText || '';
+      } else {
+        const data = readFallbackData();
+        const resume = (data.resumeData || []).find(r => r.userId === userId);
+        textToAnalyze = resume?.rawText || '';
+      }
+    }
+
+    if (!textToAnalyze || !textToAnalyze.trim()) {
+      return res.status(400).json({ error: 'Resume text is required for ATS analysis. Please upload your resume first.' });
+    }
+
+    const fallbackAnalysis = analyzeAtsFallback(textToAnalyze, jobDescription, targetRole);
+
+    if (!hasGeminiKey() && !hasXAIKey()) {
+      return res.json({ success: true, analysis: fallbackAnalysis });
+    }
+
+    try {
+      const prompt = `
+You are an expert enterprise ATS (Applicant Tracking System) scanner and resume optimizer.
+Analyze this resume text against the target job description or industry software engineering standards.
+
+Resume Text:
+${textToAnalyze.substring(0, 15000)}
+
+Target Job Description / Role:
+${jobDescription || targetRole || "Full Stack Software Engineer"}
+
+Evaluate the resume and return ONLY a valid JSON object matching this exact structure:
+{
+  "atsScore": 85,
+  "scoreBreakdown": {
+    "keywordsMatch": 80,
+    "formattingAndStructure": 90,
+    "quantifiableImpact": 75,
+    "experienceRelevance": 85
+  },
+  "summary": "Brief 1-2 sentence executive summary of the resume's ATS readiness and key recommendations.",
+  "matchedKeywords": ["React", "Node.js", "MongoDB", "JavaScript"],
+  "missingKeywords": ["Docker", "Kubernetes", "CI/CD", "TypeScript", "Jest"],
+  "strengths": [
+    "Clean structural flow with clear contact details and education credentials.",
+    "Strong keyword density in core frontend and backend technologies."
+  ],
+  "weaknesses": [
+    "Several project bullet points lack measurable numbers, metrics, or performance outcomes.",
+    "Missing key cloud, testing, and DevOps keywords expected for modern development roles."
+  ],
+  "formattingIssues": [
+    "Add a 2-3 line Professional Summary at the top for faster ATS recruiter scanning."
+  ],
+  "bulletPointImprovements": [
+    {
+      "original": "Worked on backend APIs and connected database",
+      "improved": "Architected 12+ RESTful microservices in Node.js/Express, reducing database query latency by 35% across 10,000+ daily active users",
+      "reason": "Includes quantifiable metrics, action verbs, and specific architectural accomplishments."
+    }
+  ]
+}
+`;
+      let text;
+      if (hasGeminiKey()) {
+        text = await callGeminiChat(prompt);
+      } else {
+        text = await callXAIChat(prompt);
+      }
+      const analysis = parseAiJsonSafely(text, fallbackAnalysis);
+      return res.json({ success: true, analysis });
+    } catch (aiErr) {
+      console.warn("AI ATS analysis error, using deterministic fallback:", aiErr.message);
+      return res.json({ success: true, analysis: fallbackAnalysis });
+    }
+  } catch (err) {
+    console.error("ATS analysis error:", err);
+    return res.status(500).json({ error: 'Failed to complete ATS analysis.' });
+  }
+};
+
+module.exports = {
+  uploadResume,
+  getResume,
+  generateQuestions,
+  followUp,
+  evaluateAnswer,
+  detectAI,
+  finalReport,
+  saveSession,
+  getSessionHistory,
+  proctorViolation,
+  analyzeResumeATS
+};

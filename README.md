@@ -28,7 +28,10 @@
 
 ### 📄 Resume ATS Analyzer & Optimizer
 - **Instant PDF Extraction:** Upload your resume to extract contact information, work experience, education, skills, and projects using server-side stream parsing (`pdf-parse`).
-- **ATS Match Scoring:** Identifies missing high-impact keywords, computes overall ATS compatibility, and highlights weaknesses.
+- **ATS Match Scoring & Metric Breakdown:** Calculates 0–100% ATS compatibility across 4 core dimensions: Keyword Match, Formatting & Structure, Quantifiable Metrics & Impact, and Experience Relevance.
+- **Target Job Description Scanner:** Paste any job posting to detect exact keyword overlap, calculate role compatibility, and identify missing technical keywords.
+- **Weakness & Structural Gap Analysis:** Automatically flags passive phrasing, unquantified bullets, missing sections, and formatting parsing risks.
+- **AI Bullet Point Optimizer (Google XYZ Formula):** Transforms passive resume bullets into high-impact achievements using Google's formula (*"Accomplished [X] as measured by [Y], by doing [Z]"*) with 1-click copy to clipboard.
 
 ### 🕹️ Gamified Tech Trivia & MCQ Playground
 - **Topic-Based Challenges:** Test your knowledge in Data Structures, Algorithms, JavaScript, React, System Design, and Python.

@@ -223,6 +223,12 @@ describe('resumeAPI', () => {
     expect(mockAxios.post).toHaveBeenCalledWith('/api/resume/evaluate-answer', { answer: 'test' });
   });
 
+  test('analyzeATS calls POST /api/resume/analyze', () => {
+    const payload = { resumeText: 'Sample Text', jobDescription: 'Target JD' };
+    resumeAPI.analyzeATS(payload);
+    expect(mockAxios.post).toHaveBeenCalledWith('/api/resume/analyze', payload);
+  });
+
   test('getHistory calls GET /api/resume/history/:userId', () => {
     resumeAPI.getHistory('uid_2');
     expect(mockAxios.get).toHaveBeenCalledWith('/api/resume/history/uid_2');

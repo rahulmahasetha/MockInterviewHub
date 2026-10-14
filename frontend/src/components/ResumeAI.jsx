@@ -5,7 +5,8 @@ import { useUserProgress } from '../context/UserProgressContext';
 import {
   FaUpload, FaRobot, FaMicrophone, FaStop, FaArrowLeft, FaCheckCircle,
   FaSpinner, FaHistory, FaExclamationTriangle, FaBrain, FaDatabase,
-  FaSearch, FaChartBar, FaFileAlt, FaCode, FaCog
+  FaSearch, FaChartBar, FaFileAlt, FaCode, FaCog, FaBullseye, FaMagic,
+  FaLightbulb, FaCheck, FaTimes, FaFileSignature, FaCopy
 } from 'react-icons/fa';
 import PreInterviewCheck from './PreInterviewCheck';
 import MiniProctoring from './MiniProctoring';
@@ -108,6 +109,13 @@ export default function ResumeAI() {
   const [difficulty, setDifficulty] = useState('Medium');
   const [selectedCategories, setSelectedCategories] = useState(['Skills', 'Experience', 'Projects', 'Education', 'Certifications']);
   const [questionsPerCategory, setQuestionsPerCategory] = useState(2);
+
+  // ATS Optimization States
+  const [atsAnalysis, setAtsAnalysis] = useState(null);
+  const [isAnalyzingAts, setIsAnalyzingAts] = useState(false);
+  const [jobDescriptionInput, setJobDescriptionInput] = useState('');
+  const [activeConfigTab, setActiveConfigTab] = useState('ats'); // 'ats' | 'interview'
+  const [copiedBulletIdx, setCopiedBulletIdx] = useState(null);
 
   const [questionQueue, setQuestionQueue] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -246,6 +254,26 @@ export default function ResumeAI() {
     }
   };
 
+  const runAtsScan = async (text, jd = '') => {
+    const resumeText = text || resumeData?.rawText;
+    if (!resumeText) return;
+    setIsAnalyzingAts(true);
+    try {
+      const res = await resumeAPI.analyzeATS({
+        resumeText,
+        jobDescription: jd !== undefined ? jd : jobDescriptionInput,
+        userId: progress.userId
+      });
+      if (res.data?.success && res.data?.analysis) {
+        setAtsAnalysis(res.data.analysis);
+      }
+    } catch (err) {
+      console.warn("ATS scan error:", err.message);
+    } finally {
+      setIsAnalyzingAts(false);
+    }
+  };
+
   const handleUpload = async () => {
     if (!file) return;
     if (!progress.userId) { alert('Please login first.'); return; }
@@ -263,8 +291,10 @@ export default function ResumeAI() {
       const res = await resumeAPI.uploadResume(formData);
       await pipelinePromise;
       if (res.data.success) {
-        setResumeData(res.data.data);
+        const parsedResume = res.data.data;
+        setResumeData(parsedResume);
         setPipelineStep(8); // all done
+        runAtsScan(parsedResume.rawText, '');
         await new Promise(r => setTimeout(r, 600));
         setPhase('config');
       }
@@ -577,86 +607,492 @@ export default function ResumeAI() {
   /* ───────────────────────────────────────
      RENDER: CONFIG PHASE
   ─────────────────────────────────────── */
-  const renderConfig = () => (
-    <div style={{ maxWidth: '820px', margin: '0 auto', padding: '40px 20px' }}>
-      <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '14px', padding: '20px 24px', marginBottom: '28px', display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-        <FaCheckCircle style={{ fontSize: '1.5rem', color: '#10b981', flexShrink: 0, marginTop: '2px' }} />
-        <div>
-          <div style={{ fontWeight: 700, color: '#34d399', marginBottom: '6px', fontSize: '1.05rem' }}>Resume Analyzed Successfully!</div>
-          <div style={{ color: '#6ee7b7', fontSize: '0.88rem', lineHeight: 1.6 }}>
-            Found <strong>{resumeData?.skills?.length || 0} skills</strong> · <strong>{resumeData?.projects?.length || 0} projects</strong> · <strong>{resumeData?.experience?.length || 0} experience entries</strong> · <strong>{resumeData?.education?.length || 0} education items</strong>
-          </div>
-          {resumeData?.skills?.length > 0 && (
-            <div style={{ marginTop: '12px' }}>
-              {resumeData.skills.slice(0, 16).map((s, i) => <SkillTag key={i} skill={s} />)}
-              {resumeData.skills.length > 16 && <span style={{ color: '#6366f1', fontSize: '0.78rem', marginLeft: '4px' }}>+{resumeData.skills.length - 16} more</span>}
+  const renderConfig = () => {
+    const atsScore = atsAnalysis?.atsScore ?? 0;
+    const scoreColor = atsScore >= 80 ? '#10b981' : atsScore >= 60 ? '#f59e0b' : '#ef4444';
+    const scoreStatus = atsScore >= 80
+      ? 'Strong ATS Compatibility'
+      : atsScore >= 60
+      ? 'Moderate Match — Optimization Recommended'
+      : 'Low Match — High Risk of Automated Rejection';
+
+    const breakdown = atsAnalysis?.scoreBreakdown || {
+      keywordsMatch: 0,
+      formattingAndStructure: 0,
+      quantifiableImpact: 0,
+      experienceRelevance: 0
+    };
+
+    const handleCopyBullet = (text, idx) => {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text);
+        setCopiedBulletIdx(idx);
+        setTimeout(() => setCopiedBulletIdx(null), 2000);
+      }
+    };
+
+    return (
+      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '32px 16px', animation: 'fadeInUp 0.4s ease' }}>
+        {/* Top Summary Banner */}
+        <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '14px', padding: '16px 20px', marginBottom: '24px', display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+          <FaCheckCircle style={{ fontSize: '1.4rem', color: '#10b981', flexShrink: 0, marginTop: '2px' }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, color: '#34d399', marginBottom: '4px', fontSize: '1rem' }}>Resume Parsed & Vectorized</div>
+            <div style={{ color: '#94a3b8', fontSize: '0.85rem', lineHeight: 1.5 }}>
+              Found <strong style={{ color: '#f1f5f9' }}>{resumeData?.skills?.length || 0} skills</strong> · <strong style={{ color: '#f1f5f9' }}>{resumeData?.projects?.length || 0} projects</strong> · <strong style={{ color: '#f1f5f9' }}>{resumeData?.experience?.length || 0} experience entries</strong> · <strong style={{ color: '#f1f5f9' }}>{resumeData?.education?.length || 0} education items</strong>
             </div>
-          )}
+            {resumeData?.skills?.length > 0 && (
+              <div style={{ marginTop: '10px' }}>
+                {resumeData.skills.slice(0, 12).map((s, i) => <SkillTag key={i} skill={s} />)}
+                {resumeData.skills.length > 12 && <span style={{ color: '#6366f1', fontSize: '0.78rem', marginLeft: '4px' }}>+{resumeData.skills.length - 12} more</span>}
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Tab Navigation */}
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setActiveConfigTab('ats')}
+            style={{
+              padding: '12px 22px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+              background: activeConfigTab === 'ats' ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'rgba(255,255,255,0.04)',
+              color: activeConfigTab === 'ats' ? '#fff' : '#94a3b8',
+              fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '10px',
+              boxShadow: activeConfigTab === 'ats' ? '0 0 20px rgba(99,102,241,0.35)' : 'none',
+              transition: 'all 0.25s ease'
+            }}
+          >
+            <FaBullseye style={{ color: activeConfigTab === 'ats' ? '#fff' : '#818cf8' }} />
+            ATS Match & Weakness Optimizer
+            {atsAnalysis && (
+              <span style={{
+                background: activeConfigTab === 'ats' ? 'rgba(255,255,255,0.2)' : 'rgba(99,102,241,0.2)',
+                color: activeConfigTab === 'ats' ? '#fff' : '#a5b4fc',
+                fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', fontWeight: 800
+              }}>
+                {atsScore}%
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveConfigTab('interview')}
+            style={{
+              padding: '12px 22px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+              background: activeConfigTab === 'interview' ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'rgba(255,255,255,0.04)',
+              color: activeConfigTab === 'interview' ? '#fff' : '#94a3b8',
+              fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '10px',
+              boxShadow: activeConfigTab === 'interview' ? '0 0 20px rgba(99,102,241,0.35)' : 'none',
+              transition: 'all 0.25s ease'
+            }}
+          >
+            <FaRobot style={{ color: activeConfigTab === 'interview' ? '#fff' : '#818cf8' }} />
+            Setup AI Interview
+          </button>
+        </div>
+
+        {/* TAB 1: ATS MATCH & OPTIMIZER */}
+        {activeConfigTab === 'ats' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Loading ATS state */}
+            {isAnalyzingAts && !atsAnalysis ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', background: 'rgba(15,23,42,0.6)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <FaSpinner className="rai-spin" style={{ fontSize: '2.5rem', color: '#6366f1', marginBottom: '16px' }} />
+                <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '1.1rem' }}>Calculating ATS Match Score & Analyzing Weaknesses...</div>
+                <div style={{ color: '#94a3b8', fontSize: '0.88rem', marginTop: '6px' }}>Evaluating keyword density, metric impact, and recruiter readability.</div>
+              </div>
+            ) : (
+              <>
+                {/* Hero ATS Score & Breakdown Card */}
+                <div style={{
+                  background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', padding: '28px',
+                  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '28px', alignItems: 'center'
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                    <ScoreRing value={atsScore} label="ATS Score" color={scoreColor} size={130} />
+                    <div style={{
+                      marginTop: '12px', fontSize: '0.78rem', fontWeight: 700, padding: '4px 12px',
+                      borderRadius: '20px', background: `${scoreColor}15`, border: `1px solid ${scoreColor}40`,
+                      color: scoreColor, textAlign: 'center'
+                    }}>
+                      {scoreStatus}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                      ATS Scoring Breakdown
+                    </div>
+                    {[
+                      { label: 'Keyword Match', val: breakdown.keywordsMatch, color: '#6366f1' },
+                      { label: 'Formatting & Structure', val: breakdown.formattingAndStructure, color: '#10b981' },
+                      { label: 'Quantifiable Impact & Metrics', val: breakdown.quantifiableImpact, color: '#f59e0b' },
+                      { label: 'Experience & Role Relevance', val: breakdown.experienceRelevance, color: '#0ea5e9' }
+                    ].map(item => (
+                      <div key={item.label}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px' }}>
+                          <span style={{ color: '#cbd5e1', fontWeight: 600 }}>{item.label}</span>
+                          <span style={{ color: item.color, fontWeight: 700 }}>{item.val}%</span>
+                        </div>
+                        <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ width: `${item.val}%`, height: '100%', background: item.color, borderRadius: '4px', transition: 'width 0.8s ease' }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* AI Executive Summary */}
+                {atsAnalysis?.summary && (
+                  <div style={{
+                    background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)',
+                    borderRadius: '14px', padding: '18px 22px', display: 'flex', gap: '14px', alignItems: 'flex-start'
+                  }}>
+                    <FaBrain style={{ color: '#818cf8', fontSize: '1.3rem', flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#a5b4fc', fontSize: '0.92rem', marginBottom: '4px' }}>AI Match Assessment</div>
+                      <div style={{ color: '#cbd5e1', fontSize: '0.88rem', lineHeight: 1.6 }}>{atsAnalysis.summary}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Target Job Description Match Scanner */}
+                <div style={{
+                  background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '16px', padding: '24px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <FaBullseye style={{ color: '#ec4899', fontSize: '1.1rem' }} />
+                    <span style={{ fontWeight: 700, color: '#f1f5f9', fontSize: '1.05rem' }}>Scan Against a Target Job Description</span>
+                  </div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '14px' }}>
+                    Paste a job posting or target role requirements to compute exact keyword overlaps and pinpoint what's missing.
+                  </div>
+                  <textarea
+                    rows={4}
+                    value={jobDescriptionInput}
+                    onChange={(e) => setJobDescriptionInput(e.target.value)}
+                    placeholder="Paste job description here (e.g. Senior Full Stack Engineer: React, TypeScript, Node.js, AWS, Kubernetes, GraphQL, CI/CD, Microservices...)"
+                    style={{
+                      width: '100%', padding: '12px 16px', borderRadius: '10px',
+                      border: '1px solid rgba(99,102,241,0.25)', background: 'rgba(15,23,42,0.8)',
+                      color: '#e2e8f0', fontSize: '0.88rem', outline: 'none', resize: 'vertical',
+                      lineHeight: 1.5, boxSizing: 'border-box'
+                    }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+                    <button
+                      onClick={() => runAtsScan(resumeData?.rawText, jobDescriptionInput)}
+                      disabled={isAnalyzingAts}
+                      style={{
+                        padding: '10px 22px', borderRadius: '10px', border: 'none',
+                        background: 'linear-gradient(135deg, #ec4899, #be185d)',
+                        color: '#fff', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        boxShadow: '0 0 18px rgba(236,72,153,0.35)', transition: 'all 0.2s'
+                      }}
+                    >
+                      {isAnalyzingAts ? <><FaSpinner className="rai-spin" /> Scanning JD...</> : <><FaSearch /> Scan Job Description</>}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Keyword Intelligence: Matched vs Missing */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                  {/* Matched Keywords */}
+                  <div style={{
+                    background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(16,185,129,0.25)',
+                    borderRadius: '16px', padding: '22px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34d399', fontWeight: 700, fontSize: '0.95rem' }}>
+                        <FaCheck style={{ color: '#10b981' }} /> Matched ATS Keywords
+                      </div>
+                      <span style={{ background: 'rgba(16,185,129,0.2)', color: '#6ee7b7', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
+                        {atsAnalysis?.matchedKeywords?.length || 0}
+                      </span>
+                    </div>
+                    {atsAnalysis?.matchedKeywords?.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {atsAnalysis.matchedKeywords.map((kw, i) => (
+                          <span key={i} style={{
+                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600,
+                            background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', color: '#6ee7b7'
+                          }}>
+                            ✓ {kw}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ color: '#64748b', fontSize: '0.85rem' }}>No major technical keywords detected in resume text.</div>
+                    )}
+                  </div>
+
+                  {/* Missing Keywords */}
+                  <div style={{
+                    background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(244,63,94,0.25)',
+                    borderRadius: '16px', padding: '22px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fb7185', fontWeight: 700, fontSize: '0.95rem' }}>
+                        <FaTimes style={{ color: '#f43f5e' }} /> Missing High-Impact Keywords
+                      </div>
+                      <span style={{ background: 'rgba(244,63,94,0.2)', color: '#fda4af', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
+                        {atsAnalysis?.missingKeywords?.length || 0}
+                      </span>
+                    </div>
+                    {atsAnalysis?.missingKeywords?.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {atsAnalysis.missingKeywords.map((kw, i) => (
+                          <span key={i} style={{
+                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600,
+                            background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.3)', color: '#fda4af'
+                          }}>
+                            + {kw}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ color: '#34d399', fontSize: '0.85rem' }}>All core high-impact keywords matched!</div>
+                    )}
+                    <div style={{ marginTop: '14px', fontSize: '0.76rem', color: '#94a3b8', lineHeight: 1.4 }}>
+                      💡 Tip: Incorporate these keywords into your skills list or project descriptions to satisfy automated resume screeners.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Strengths & Weaknesses Analysis */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                  {/* Strengths */}
+                  <div style={{
+                    background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '16px', padding: '22px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34d399', fontWeight: 700, fontSize: '0.95rem', marginBottom: '14px' }}>
+                      <FaCheckCircle style={{ color: '#10b981' }} /> Resume Strengths
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: '18px', color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.7 }}>
+                      {(atsAnalysis?.strengths || []).map((s, i) => (
+                        <li key={i} style={{ marginBottom: '6px' }}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Weaknesses & Critical Gaps */}
+                  <div style={{
+                    background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(245,158,11,0.25)',
+                    borderRadius: '16px', padding: '22px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fbbf24', fontWeight: 700, fontSize: '0.95rem', marginBottom: '14px' }}>
+                      <FaExclamationTriangle style={{ color: '#f59e0b' }} /> Weaknesses & Critical Gaps
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: '18px', color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.7 }}>
+                      {(atsAnalysis?.weaknesses || []).map((w, i) => (
+                        <li key={i} style={{ marginBottom: '6px' }}>{w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Formatting Issues (if any) */}
+                {atsAnalysis?.formattingIssues?.length > 0 && (
+                  <div style={{
+                    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                    borderRadius: '14px', padding: '18px 22px', display: 'flex', gap: '14px', alignItems: 'flex-start'
+                  }}>
+                    <FaFileSignature style={{ color: '#f87171', fontSize: '1.2rem', flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#fca5a5', fontSize: '0.92rem', marginBottom: '4px' }}>ATS Formatting & Parsing Warnings</div>
+                      <ul style={{ margin: 0, paddingLeft: '18px', color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.6 }}>
+                        {atsAnalysis.formattingIssues.map((issue, idx) => (
+                          <li key={idx}>{issue}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {/* AI Bullet Point Optimizer (Google XYZ Formula) */}
+                {atsAnalysis?.bulletPointImprovements?.length > 0 && (
+                  <div style={{
+                    background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(99,102,241,0.25)',
+                    borderRadius: '16px', padding: '24px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                      <FaMagic style={{ color: '#a5b4fc', fontSize: '1.2rem' }} />
+                      <span style={{ fontWeight: 800, color: '#f1f5f9', fontSize: '1.1rem' }}>AI Bullet Point Optimizer (Google XYZ Formula)</span>
+                    </div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '20px' }}>
+                      Formulated as: <em>Accomplished [X] as measured by [Y], by doing [Z]</em>. Replaces passive phrases with measurable impact.
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                      {atsAnalysis.bulletPointImprovements.map((item, idx) => (
+                        <div key={idx} style={{
+                          background: 'rgba(30,41,59,0.7)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)',
+                          padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px'
+                        }}>
+                          {/* Original */}
+                          <div>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px' }}>
+                              Original Bullet Point
+                            </div>
+                            <div style={{ color: '#94a3b8', fontSize: '0.86rem', fontStyle: 'italic', background: 'rgba(15,23,42,0.5)', padding: '10px 14px', borderRadius: '8px' }}>
+                              "{item.original}"
+                            </div>
+                          </div>
+
+                          {/* Improved */}
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                                ✨ AI Improved Version (XYZ Formula)
+                              </span>
+                              <button
+                                onClick={() => handleCopyBullet(item.improved, idx)}
+                                style={{
+                                  background: 'none', border: 'none', color: copiedBulletIdx === idx ? '#34d399' : '#818cf8',
+                                  fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600
+                                }}
+                              >
+                                {copiedBulletIdx === idx ? <><FaCheck /> Copied!</> : <><FaCopy /> Copy</>}
+                              </button>
+                            </div>
+                            <div style={{
+                              color: '#f1f5f9', fontSize: '0.9rem', fontWeight: 600,
+                              background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(16,185,129,0.1))',
+                              border: '1px solid rgba(99,102,241,0.35)', padding: '12px 14px', borderRadius: '8px', lineHeight: 1.5
+                            }}>
+                              {item.improved}
+                            </div>
+                          </div>
+
+                          {/* Reason */}
+                          {item.reason && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#94a3b8', fontSize: '0.78rem' }}>
+                              <FaLightbulb style={{ color: '#f59e0b', flexShrink: 0 }} />
+                              <span>{item.reason}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Bottom CTA to Interview */}
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(79,70,229,0.08))',
+                  border: '1px solid rgba(99,102,241,0.3)', borderRadius: '16px', padding: '24px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#f1f5f9', fontSize: '1.05rem', marginBottom: '4px' }}>
+                      Ready to Put Your Resume to the Test?
+                    </div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                      Our voice-enabled AI interviewer will grill you on every project and skill listed on your resume.
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveConfigTab('interview')}
+                    style={{
+                      padding: '14px 28px', borderRadius: '10px', border: 'none',
+                      background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                      color: '#fff', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      boxShadow: '0 0 20px rgba(99,102,241,0.4)', transition: 'all 0.2s'
+                    }}
+                  >
+                    Proceed to AI Interview Setup ➔
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: INTERVIEW SETUP */}
+        {activeConfigTab === 'interview' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9', margin: 0 }}>Configure Your AI Interview</h2>
+              <button
+                onClick={() => setActiveConfigTab('ats')}
+                style={{
+                  background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.88rem', fontWeight: 600
+                }}
+              >
+                ← Back to ATS Optimizer
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Difficulty Level</label>
+                <select value={difficulty} onChange={e => setDifficulty(e.target.value)}
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(15,23,42,0.6)', color: '#e2e8f0', fontSize: '0.95rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}>
+                  <option>Easy</option><option>Medium</option><option>Hard</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Questions Per Category</label>
+                <select value={questionsPerCategory} onChange={e => setQuestionsPerCategory(Number(e.target.value))}
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(15,23,42,0.6)', color: '#e2e8f0', fontSize: '0.95rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}>
+                  <option value={1}>1 — Quick (5 mins)</option>
+                  <option value={2}>2 — Standard (15 mins)</option>
+                  <option value={3}>3 — Detailed (25 mins)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>Resume Categories to Cover</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
+                {availableCategories.map(cat => (
+                  <label key={cat} style={{
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px',
+                    borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s',
+                    background: selectedCategories.includes(cat) ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${selectedCategories.includes(cat) ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                    userSelect: 'none'
+                  }}>
+                    <input type="checkbox" checked={selectedCategories.includes(cat)} onChange={() => toggleCategory(cat)} style={{ accentColor: '#6366f1', width: '16px', height: '16px' }} />
+                    <span style={{ fontSize: '0.88rem', color: selectedCategories.includes(cat) ? '#a5b4fc' : '#94a3b8', fontWeight: 600 }}>{cat}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '12px', padding: '16px 20px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+              <FaExclamationTriangle style={{ color: '#f59e0b', fontSize: '1.2rem', flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <div style={{ fontWeight: 700, color: '#fbbf24', marginBottom: '4px' }}>Proctoring Enabled</div>
+                <div style={{ color: '#d97706', fontSize: '0.85rem' }}>Stay on this page. Tab switching or window blur counts as violations. {MAX_VIOLATIONS} violations = auto-submit.</div>
+              </div>
+            </div>
+
+            <button
+              onClick={startInterview}
+              disabled={isGeneratingNext || selectedCategories.length === 0}
+              style={{
+                width: '100%', padding: '18px', borderRadius: '12px', border: 'none',
+                background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                color: '#fff', fontWeight: 800, fontSize: '1.1rem', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                boxShadow: '0 0 30px rgba(99,102,241,0.4)', transition: 'all 0.3s ease'
+              }}
+            >
+              {isGeneratingNext ? <><FaSpinner className="rai-spin" /> Preparing AI Interviewer...</> : <><FaRobot /> Start Proctored Interview</>}
+            </button>
+          </div>
+        )}
       </div>
-
-      <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#f1f5f9', marginBottom: '24px' }}>Configure Your Interview</h2>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-        <div>
-          <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Difficulty Level</label>
-          <select value={difficulty} onChange={e => setDifficulty(e.target.value)}
-            style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(15,23,42,0.6)', color: '#e2e8f0', fontSize: '0.95rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}>
-            <option>Easy</option><option>Medium</option><option>Hard</option>
-          </select>
-        </div>
-        <div>
-          <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Questions Per Category</label>
-          <select value={questionsPerCategory} onChange={e => setQuestionsPerCategory(Number(e.target.value))}
-            style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(15,23,42,0.6)', color: '#e2e8f0', fontSize: '0.95rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}>
-            <option value={1}>1 — Quick (5 mins)</option>
-            <option value={2}>2 — Standard (15 mins)</option>
-            <option value={3}>3 — Detailed (25 mins)</option>
-          </select>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '24px' }}>
-        <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>Resume Categories to Cover</label>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
-          {availableCategories.map(cat => (
-            <label key={cat} style={{
-              display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px',
-              borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s',
-              background: selectedCategories.includes(cat) ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)',
-              border: `1px solid ${selectedCategories.includes(cat) ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.08)'}`,
-              userSelect: 'none'
-            }}>
-              <input type="checkbox" checked={selectedCategories.includes(cat)} onChange={() => toggleCategory(cat)} style={{ accentColor: '#6366f1', width: '16px', height: '16px' }} />
-              <span style={{ fontSize: '0.88rem', color: selectedCategories.includes(cat) ? '#a5b4fc' : '#94a3b8', fontWeight: 600 }}>{cat}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '12px', padding: '16px 20px', marginBottom: '28px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-        <FaExclamationTriangle style={{ color: '#f59e0b', fontSize: '1.2rem', flexShrink: 0, marginTop: '2px' }} />
-        <div>
-          <div style={{ fontWeight: 700, color: '#fbbf24', marginBottom: '4px' }}>Proctoring Enabled</div>
-          <div style={{ color: '#d97706', fontSize: '0.85rem' }}>Stay on this page. Tab switching or window blur counts as violations. {MAX_VIOLATIONS} violations = auto-submit.</div>
-        </div>
-      </div>
-
-      <button
-        onClick={startInterview}
-        disabled={isGeneratingNext || selectedCategories.length === 0}
-        style={{
-          width: '100%', padding: '18px', borderRadius: '12px', border: 'none',
-          background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-          color: '#fff', fontWeight: 800, fontSize: '1.1rem', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
-          boxShadow: '0 0 30px rgba(99,102,241,0.4)', transition: 'all 0.3s ease'
-        }}
-      >
-        {isGeneratingNext ? <><FaSpinner className="rai-spin" /> Preparing AI Interviewer...</> : <><FaRobot /> Start Proctored Interview</>}
-      </button>
-    </div>
-  );
+    );
+  };
 
   /* ───────────────────────────────────────
      RENDER: INTERVIEW PHASE
