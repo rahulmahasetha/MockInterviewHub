@@ -18,8 +18,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/triviatrek';
 
-// Connect to Database in non-test environments
-if (process.env.NODE_ENV !== 'test') {
+// Connect to Database when server is started directly
+if (require.main === module) {
   connectDB(MONGODB_URI);
 }
 
@@ -47,7 +47,7 @@ app.use('/api/resume', resumeRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Start Express Server
-if (process.env.NODE_ENV !== 'test' && require.main === module) {
+if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`===============================================`);
     console.log(`🚀 EduQuest Backend Server Running on Port ${PORT}`);

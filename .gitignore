@@ -39,6 +39,8 @@ __pycache__/
 backend/uploads/*
 !backend/uploads/.gitkeep
 
-# Test execution result artifacts
+# Test execution result artifacts and coverage
 test-results*.json
+coverage/
+**/coverage/
 

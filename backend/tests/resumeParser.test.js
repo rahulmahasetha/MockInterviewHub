@@ -16,7 +16,7 @@ Projects
 - Built an analytics dashboard with React and Node.js
 
 Education
-- B.Tech in Computer Science, IIT Delhi
+- B.Tech in Computer Science, SRM University AP
 
 Certifications
 - AWS Certified Developer Associate
