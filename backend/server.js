@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-const { connectDB } = require('./config/db');
+const { connectDB, getIsMongoDBConnected } = require('./config/db');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -18,11 +18,23 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/triviatrek';
 
-// Connect to Database
-connectDB(MONGODB_URI);
+// Connect to Database in non-test environments
+if (process.env.NODE_ENV !== 'test') {
+  connectDB(MONGODB_URI);
+}
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Health check endpoint for deployment probes & uptime monitoring
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    database: getIsMongoDBConnected() ? 'connected' : 'fallback_mode'
+  });
+});
 
 // Mount routes
 app.use('/auth', authRoutes);
@@ -35,9 +47,14 @@ app.use('/api/resume', resumeRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Start Express Server
-app.listen(PORT, () => {
-  console.log(`===============================================`);
-  console.log(`🚀 EduQuest Backend Server Running on Port ${PORT}`);
-  console.log(`🔗 API Base: http://localhost:${PORT}`);
-  console.log(`===============================================`);
-});
+if (process.env.NODE_ENV !== 'test' && require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`===============================================`);
+    console.log(`🚀 EduQuest Backend Server Running on Port ${PORT}`);
+    console.log(`🔗 API Base: http://localhost:${PORT}`);
+    console.log(`===============================================`);
+  });
+}
+
+module.exports = app;
+

@@ -60,7 +60,7 @@ export default function Playground() {
 
   const handleTerminate = () => {
     alert('Maximum proctoring violations reached. Terminating quiz.');
-    navigate('/home');
+    navigate('/');
   };
 
   function onLevelClick(level) {

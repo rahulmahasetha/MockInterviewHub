@@ -1,0 +1,156 @@
+name: CD Pipeline (Production Deployment)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Deployment Environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  # ============================================================================
+  # QUALITY GATE: Ensure tests pass and bundle builds before any deployment
+  # ============================================================================
+  verify-and-test:
+    name: Verify Quality Gates (Tests & Build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install & Test Backend
+        working-directory: backend
+        env:
+          CI: true
+          NODE_ENV: test
+          JWT_SECRET: test_jwt_secret_key_minimum_32_characters_for_ci
+          PORT: 3001
+        run: |
+          npm ci
+          npm test
+
+      - name: Install, Test & Build Frontend
+        working-directory: frontend
+        env:
+          CI: true
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://api.mockinterviewhub.com' }}
+        run: |
+          npm ci
+          npm run test:ci
+          npm run build
+
+  # ============================================================================
+  # BACKEND DEPLOYMENT: Render / Railway Webhook + Health Check Probe
+  # ============================================================================
+  deploy-backend:
+    name: Deploy Backend Service
+    needs: [verify-and-test]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Backend Deployment
+        id: trigger_backend
+        run: |
+          if [ -n "${{ secrets.RENDER_BACKEND_DEPLOY_HOOK_URL }}" ]; then
+            echo "🚀 Triggering Render backend deployment via secure deploy hook..."
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_BACKEND_DEPLOY_HOOK_URL }}")
+            if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+              echo "✅ Render deployment successfully triggered (HTTP $HTTP_STATUS)."
+            else
+              echo "❌ Render deploy hook returned HTTP $HTTP_STATUS."
+              exit 1
+            fi
+          elif [ -n "${{ secrets.BACKEND_DEPLOY_WEBHOOK_URL }}" ]; then
+            echo "🚀 Triggering custom backend deploy webhook..."
+            curl -fsS -X POST "${{ secrets.BACKEND_DEPLOY_WEBHOOK_URL }}"
+          else
+            echo "ℹ️ Note: No backend deploy secret configured (RENDER_BACKEND_DEPLOY_HOOK_URL or BACKEND_DEPLOY_WEBHOOK_URL)."
+            echo "ℹ️ To automate backend deployment, add your hosting provider's Deploy Hook URL in GitHub Secrets."
+          fi
+
+      - name: Verify Backend Health Probe
+        if: ${{ secrets.BACKEND_PRODUCTION_URL != '' }}
+        run: |
+          echo "🔍 Probing backend health check at ${{ secrets.BACKEND_PRODUCTION_URL }}/health..."
+          ATTEMPTS=0
+          MAX_ATTEMPTS=15
+          HEALTHY=false
+
+          until [ "$ATTEMPTS" -ge "$MAX_ATTEMPTS" ]; do
+            RESPONSE=$(curl -s --max-time 10 "${{ secrets.BACKEND_PRODUCTION_URL }}/health" || echo "")
+            if echo "$RESPONSE" | grep -q "healthy"; then
+              echo "✅ Backend probe successful: $RESPONSE"
+              HEALTHY=true
+              break
+            fi
+            ATTEMPTS=$((ATTEMPTS+1))
+            echo "⏳ Attempt $ATTEMPTS/$MAX_ATTEMPTS: Backend not ready yet. Retrying in 10s..."
+            sleep 10
+          done
+
+          if [ "$HEALTHY" != "true" ]; then
+            echo "❌ Deployment verification failed! /health did not respond with healthy status within timeout."
+            echo "⚠️ Action required: Check hosting logs and consider rolling back to previous deployment."
+            exit 1
+          fi
+
+  # ============================================================================
+  # FRONTEND DEPLOYMENT: Vercel Production Deployment + Site Probe
+  # ============================================================================
+  deploy-frontend:
+    name: Deploy Frontend Application
+    needs: [verify-and-test, deploy-backend]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        id: deploy_vercel
+        if: ${{ secrets.VERCEL_TOKEN != '' }}
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: ./frontend
+
+      - name: Trigger Vercel Deploy Hook (Alternative)
+        if: ${{ secrets.VERCEL_TOKEN == '' && secrets.VERCEL_FRONTEND_DEPLOY_HOOK_URL != '' }}
+        run: |
+          echo "🚀 Triggering Vercel deployment via Deploy Hook..."
+          curl -fsS -X POST "${{ secrets.VERCEL_FRONTEND_DEPLOY_HOOK_URL }}"
+
+      - name: Verify Frontend Availability
+        if: ${{ secrets.FRONTEND_PRODUCTION_URL != '' }}
+        run: |
+          echo "🔍 Probing frontend production URL: ${{ secrets.FRONTEND_PRODUCTION_URL }}..."
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 "${{ secrets.FRONTEND_PRODUCTION_URL }}")
+          if [ "$STATUS_CODE" -ge 200 ] && [ "$STATUS_CODE" -lt 400 ]; then
+            echo "✅ Frontend is reachable and returning HTTP $STATUS_CODE."
+          else
+            echo "❌ Frontend returned unexpected HTTP status: $STATUS_CODE"
+            exit 1
+          fi

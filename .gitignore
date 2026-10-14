@@ -1,8 +1,12 @@
 # Node packages and modules
 **/node_modules/
 
-# Backend configurations and local credentials
-**/backend/.env
+# Environment configurations and local credentials
+**/.env
+**/.env.local
+**/.env.*.local
+!**/.env.example
+
 
 # Local fallback database records (avoids polluting GitHub with personal scores)
 **/backend/db_fallback.json
@@ -30,3 +34,11 @@ Thumbs.db
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# User uploaded resumes
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Test execution result artifacts
+test-results*.json
+

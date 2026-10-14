@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import { FaArrowLeft, FaPlus, FaTrash, FaSave, FaEye, FaDownload } from 'react-icons/fa';
 import * as Icons from 'react-icons/fa';
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = (process.env.REACT_APP_API_URL || 'http://127.0.0.1:3001') + '/api';
 
 export default function ResumeBuilder() {
   const navigate = useNavigate();
