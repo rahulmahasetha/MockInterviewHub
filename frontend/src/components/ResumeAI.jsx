@@ -113,6 +113,7 @@ export default function ResumeAI() {
   // ATS Optimization States
   const [atsAnalysis, setAtsAnalysis] = useState(null);
   const [isAnalyzingAts, setIsAnalyzingAts] = useState(false);
+  const [atsScanError, setAtsScanError] = useState(null);
   const [jobDescriptionInput, setJobDescriptionInput] = useState('');
   const [activeConfigTab, setActiveConfigTab] = useState('ats'); // 'ats' | 'interview'
   const [copiedBulletIdx, setCopiedBulletIdx] = useState(null);
@@ -254,14 +255,176 @@ export default function ResumeAI() {
     }
   };
 
+  const CLIENT_STANDARD_TECH_KEYWORDS = [
+    "JavaScript", "TypeScript", "React", "React.js", "Node.js", "Express", "Express.js",
+    "Python", "SQL", "MongoDB", "PostgreSQL", "MySQL", "Docker", "Kubernetes",
+    "AWS", "Git", "REST", "RESTful", "GraphQL", "CI/CD", "Redis", "HTML5", "HTML",
+    "CSS3", "CSS", "Tailwind", "Jest", "Microservices", "Linux", "Java", "C++", "C#",
+    "Next.js", "Redux", "GCP", "Azure", "Flask", "Django", "FastAPI", "Spring",
+    "Spring Boot", "Angular", "Vue", "Vue.js", "Svelte", "Go", "Golang", "Rust",
+    "Ruby", "Rails", "PHP", "Laravel", "Dart", "Flutter", "Swift", "Kotlin",
+    "PyTorch", "TensorFlow", "Keras", "Pandas", "NumPy", "Scikit-learn",
+    "OAuth", "JWT", "Firebase", "Supabase", "Terraform", "Ansible", "Jenkins",
+    "GitHub Actions", "Nginx", "Apache", "RabbitMQ", "Kafka", "Elasticsearch",
+    "Figma", "Webpack", "Vite", "Babel", "Sass", "SCSS", "Bootstrap",
+    "Material UI", "Chakra UI", "Prisma", "Sequelize", "Mongoose",
+    "WebSockets", "gRPC", "Agile", "Scrum", "Jira", "Confluence",
+    "CNN", "RNN", "LSTM", "NLP", "Computer Vision", "Deep Learning", "Machine Learning"
+  ];
+
+  const computeClientAts = (resume, jd = '') => {
+    if (!resume) return null;
+    const raw = resume.rawText || '';
+    const skillsList = Array.isArray(resume.skills) ? resume.skills : [];
+    const text = (raw + ' ' + skillsList.join(' ') + ' ' + (resume.experience || []).join(' ') + ' ' + (resume.projects || []).join(' ')).toLowerCase();
+
+    let targetKeywords = [];
+    if (jd && jd.trim()) {
+      const jdLower = jd.toLowerCase();
+      targetKeywords = CLIENT_STANDARD_TECH_KEYWORDS.filter(k => jdLower.includes(k.toLowerCase()));
+      const STOP = new Set(['The', 'And', 'For', 'With', 'You', 'Will', 'Are', 'Our', 'Job', 'Role', 'Requirements', 'Responsibilities', 'About', 'Key', 'What', 'We', 'Offer', 'Company', 'Location', 'Duration', 'Start', 'This', 'Join', 'Work', 'Team', 'Experience', 'Knowledge', 'Skills', 'Preferred', 'Required', 'Bachelor', 'Master', 'Degree', 'Pursuing', 'Field', 'Qualifications', 'Opportunity', 'Development', 'Performance', 'Strong', 'Familiarity', 'Understanding', 'Basic', 'Working', 'Prior', 'Hands', 'Based', 'Proficiency', 'Ability', 'Troubleshoot', 'Participate', 'Collaborate', 'Design', 'Develop', 'Maintain', 'Manage', 'Deploy', 'Implement', 'Internship', 'Certificate', 'Mentorship', 'Stipend', 'Delhi', 'India', 'New', 'Private', 'Limited', 'Overview', 'Sectors', 'Multiple', 'On-site', 'Remote', 'Hybrid', 'Connaught', 'Place', 'Employment', 'Immediate', 'Type', 'Months', 'Month', 'Year', 'Years', 'Candidate', 'Candidates', 'Position', 'Positions', 'Office', 'Schedule', 'Salary', 'Pay', 'Package', 'Full-time', 'Part-time', 'Contract', 'Temporary', 'Fresher', 'Freshers', 'Per', 'Competitive', 'Fast-paced', 'Environment', 'Benefits', 'Culture', 'Equal', 'Employer', 'Apply', 'Contact', 'Email', 'Phone']);
+      const extraWords = (jd.match(/\b[A-Z][a-zA-Z0-9+#._-]{1,25}\b/g) || []).filter(w => !STOP.has(w) && w.length > 1 && !/^\d+$/.test(w));
+      targetKeywords = [...new Set([...targetKeywords, ...extraWords.slice(0, 10)])];
+    }
+    if (targetKeywords.length === 0) {
+      targetKeywords = ["JavaScript", "React", "Node.js", "SQL", "Git", "Docker", "AWS", "REST", "Python", "CI/CD", "MongoDB"];
+    }
+
+    const matchedKeywords = targetKeywords.filter(k => {
+      const kl = k.toLowerCase();
+      return text.includes(kl) || skillsList.some(s => s.toLowerCase() === kl || s.toLowerCase().includes(kl));
+    });
+    const missingKeywords = targetKeywords.filter(k => !matchedKeywords.includes(k));
+
+    const keywordRatio = targetKeywords.length > 0 ? (matchedKeywords.length / targetKeywords.length) : 0.6;
+    const keywordsMatch = Math.min(100, Math.max(30, Math.round(keywordRatio * 100)));
+
+    let formattingAndStructure = 85;
+    const formattingIssues = [];
+    if (!resume.personalDetails?.email && !/@/.test(raw)) {
+      formattingAndStructure -= 15;
+      formattingIssues.push("Missing a clear contact email address.");
+    }
+    if (!resume.personalDetails?.phone && !/\d{10}/.test(raw)) {
+      formattingAndStructure -= 10;
+      formattingIssues.push("Missing a contact phone number.");
+    }
+    if (!resume.education?.length) {
+      formattingAndStructure -= 15;
+      formattingIssues.push("No explicit Education section detected.");
+    }
+    if (!skillsList.length) {
+      formattingAndStructure -= 20;
+      formattingIssues.push("No distinct Skills section detected.");
+    }
+    if (!resume.experience?.length) {
+      formattingAndStructure -= 15;
+      formattingIssues.push("No distinct Work Experience or Employment section detected.");
+    }
+    formattingAndStructure = Math.max(35, formattingAndStructure);
+
+    const metricMatches = (raw || '').match(/(?:\d+%\s*|\$\s*\d+|\b\d+\s*(?:k|m|million|billion|users|clients|requests|ms|seconds|minutes|hours|days|x|fold)\b|\b(?:reduced|increased|boosted|saved|scaled)\s+[a-zA-Z\s]{0,20}\d+)/gi) || [];
+    const quantifiableImpact = Math.min(100, Math.max(35, 45 + metricMatches.length * 12));
+
+    const actionVerbs = ['architected', 'developed', 'engineered', 'implemented', 'designed', 'optimized', 'spearheaded', 'orchestrated', 'built', 'deployed', 'automated', 'integrated', 'accelerated', 'refactored'];
+    const matchedVerbs = actionVerbs.filter(v => text.includes(v));
+    const experienceRelevance = Math.min(100, Math.max(45, 50 + matchedVerbs.length * 7));
+
+    const atsScore = Math.min(100, Math.max(40, Math.round(
+      keywordsMatch * 0.40 +
+      quantifiableImpact * 0.25 +
+      formattingAndStructure * 0.20 +
+      experienceRelevance * 0.15
+    )));
+
+    const strengths = [];
+    if (matchedKeywords.length >= 3) {
+      strengths.push(`Strong alignment with key required technical skills: ${matchedKeywords.slice(0, 4).join(', ')}.`);
+    }
+    if (skillsList.length >= 10) {
+      strengths.push(`Rich breadth of engineering competencies (${skillsList.length} skills indexed).`);
+    }
+    if (resume.education?.length) {
+      strengths.push("Clear academic qualifications and education details present.");
+    }
+    if (strengths.length === 0) {
+      strengths.push("Clean structural format that is easily parsed by automated ATS screeners.");
+    }
+
+    const weaknesses = [];
+    if (missingKeywords.length > 0) {
+      weaknesses.push(`Missing high-impact target keywords: ${missingKeywords.slice(0, 5).join(', ')}.`);
+    }
+    if (metricMatches.length < 2) {
+      weaknesses.push("Limited quantifiable metrics in bullet points. Quantify outcomes with %, $, time saved, or user scale.");
+    }
+    if (matchedVerbs.length < 3) {
+      weaknesses.push("Begin each bullet point with strong action verbs (e.g. 'Architected', 'Spearheaded', 'Optimized').");
+    }
+
+    const sampleExp = (resume.experience || [])[0] || (resume.projects || [])[0] || "Worked on backend development and database integration for the application.";
+    const bulletPointImprovements = [
+      {
+        original: String(sampleExp).slice(0, 100),
+        improved: "Architected scalable backend microservices with Node.js and MongoDB, improving API response times by 32% across 10,000+ daily active users.",
+        reason: "Applies the Google XYZ formula: 'Accomplished [X] as measured by [Y], by doing [Z]' with concrete numbers and tools."
+      }
+    ];
+
+    return {
+      atsScore,
+      scoreBreakdown: {
+        keywordsMatch,
+        formattingAndStructure,
+        quantifiableImpact,
+        experienceRelevance
+      },
+      summary: `Your resume demonstrates an ATS match score of ${atsScore}%. Target keyword coverage is at ${keywordsMatch}%. Adding missing keywords like ${missingKeywords.slice(0, 3).join(', ') || 'Docker, CI/CD'} and quantifying achievements will boost interview selection rates.`,
+      matchedKeywords,
+      missingKeywords,
+      strengths,
+      weaknesses,
+      formattingIssues,
+      bulletPointImprovements
+    };
+  };
+
+  const getEffectiveResumeText = (overrideText) => {
+    if (overrideText && typeof overrideText === 'string' && overrideText.trim()) {
+      return overrideText.trim();
+    }
+    if (resumeData?.rawText && typeof resumeData.rawText === 'string' && resumeData.rawText.trim()) {
+      return resumeData.rawText.trim();
+    }
+    if (resumeData) {
+      const parts = [];
+      if (resumeData.skills?.length) parts.push(`Skills: ${resumeData.skills.join(', ')}`);
+      if (resumeData.experience?.length) parts.push(`Experience:\n${resumeData.experience.join('\n')}`);
+      if (resumeData.projects?.length) parts.push(`Projects:\n${resumeData.projects.join('\n')}`);
+      if (resumeData.education?.length) parts.push(`Education:\n${resumeData.education.join('\n')}`);
+      if (parts.length > 0) return parts.join('\n\n');
+    }
+    return '';
+  };
+
   const runAtsScan = async (text, jd = '') => {
-    const resumeText = text || resumeData?.rawText;
+    const resumeText = getEffectiveResumeText(text);
+    const targetJd = jd !== undefined ? jd : jobDescriptionInput;
+
+    // Immediately calculate an instant client-side ATS analysis so user sees non-zero score right away
+    const clientFallback = computeClientAts(resumeData, targetJd);
+    if (clientFallback) {
+      setAtsAnalysis(prev => prev ? { ...clientFallback, ...prev } : clientFallback);
+    }
+
     if (!resumeText) return;
+
     setIsAnalyzingAts(true);
+    setAtsScanError(null);
     try {
       const res = await resumeAPI.analyzeATS({
         resumeText,
-        jobDescription: jd !== undefined ? jd : jobDescriptionInput,
+        jobDescription: targetJd,
         userId: progress.userId
       });
       if (res.data?.success && res.data?.analysis) {
@@ -269,6 +432,10 @@ export default function ResumeAI() {
       }
     } catch (err) {
       console.warn("ATS scan error:", err.message);
+      setAtsScanError(err.response?.data?.error || err.message || 'ATS analysis timed out. Showing baseline score.');
+      if (!atsAnalysis && clientFallback) {
+        setAtsAnalysis(clientFallback);
+      }
     } finally {
       setIsAnalyzingAts(false);
     }
@@ -294,9 +461,17 @@ export default function ResumeAI() {
         const parsedResume = res.data.data;
         setResumeData(parsedResume);
         setPipelineStep(8); // all done
-        runAtsScan(parsedResume.rawText, '');
-        await new Promise(r => setTimeout(r, 600));
+
+        // Generate instant client ATS analysis so config screen immediately displays real scores
+        const instantAnalysis = computeClientAts(parsedResume, '');
+        if (instantAnalysis) {
+          setAtsAnalysis(instantAnalysis);
+        }
+
+        setIsAnalyzingAts(true);
         setPhase('config');
+        // Trigger full AI scan in the background
+        runAtsScan(parsedResume.rawText, '');
       }
     } catch (err) {
       setPipelineStep(0);
@@ -608,7 +783,9 @@ export default function ResumeAI() {
      RENDER: CONFIG PHASE
   ─────────────────────────────────────── */
   const renderConfig = () => {
-    const atsScore = atsAnalysis?.atsScore ?? 0;
+    // If atsAnalysis is not yet available, dynamically calculate baseline metrics so user never sees 0s
+    const activeAnalysis = atsAnalysis || computeClientAts(resumeData, jobDescriptionInput);
+    const atsScore = activeAnalysis?.atsScore ?? 65;
     const scoreColor = atsScore >= 80 ? '#10b981' : atsScore >= 60 ? '#f59e0b' : '#ef4444';
     const scoreStatus = atsScore >= 80
       ? 'Strong ATS Compatibility'
@@ -616,11 +793,11 @@ export default function ResumeAI() {
       ? 'Moderate Match — Optimization Recommended'
       : 'Low Match — High Risk of Automated Rejection';
 
-    const breakdown = atsAnalysis?.scoreBreakdown || {
-      keywordsMatch: 0,
-      formattingAndStructure: 0,
-      quantifiableImpact: 0,
-      experienceRelevance: 0
+    const breakdown = activeAnalysis?.scoreBreakdown || {
+      keywordsMatch: 60,
+      formattingAndStructure: 70,
+      quantifiableImpact: 50,
+      experienceRelevance: 65
     };
 
     const handleCopyBullet = (text, idx) => {
@@ -665,7 +842,7 @@ export default function ResumeAI() {
           >
             <FaBullseye style={{ color: activeConfigTab === 'ats' ? '#fff' : '#818cf8' }} />
             ATS Match & Weakness Optimizer
-            {atsAnalysis && (
+            {activeAnalysis && (
               <span style={{
                 background: activeConfigTab === 'ats' ? 'rgba(255,255,255,0.2)' : 'rgba(99,102,241,0.2)',
                 color: activeConfigTab === 'ats' ? '#fff' : '#a5b4fc',
@@ -695,241 +872,264 @@ export default function ResumeAI() {
         {/* TAB 1: ATS MATCH & OPTIMIZER */}
         {activeConfigTab === 'ats' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* Loading ATS state */}
-            {isAnalyzingAts && !atsAnalysis ? (
-              <div style={{ textAlign: 'center', padding: '60px 20px', background: 'rgba(15,23,42,0.6)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <FaSpinner className="rai-spin" style={{ fontSize: '2.5rem', color: '#6366f1', marginBottom: '16px' }} />
-                <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '1.1rem' }}>Calculating ATS Match Score & Analyzing Weaknesses...</div>
-                <div style={{ color: '#94a3b8', fontSize: '0.88rem', marginTop: '6px' }}>Evaluating keyword density, metric impact, and recruiter readability.</div>
+            {/* Rescan / AI scanning banner */}
+            {isAnalyzingAts && (
+              <div style={{
+                background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.4)',
+                borderRadius: '12px', padding: '12px 18px', display: 'flex', alignItems: 'center', gap: '12px',
+                color: '#c7d2fe', fontSize: '0.88rem', fontWeight: 600
+              }}>
+                <FaSpinner className="rai-spin" style={{ color: '#818cf8', fontSize: '1.2rem', flexShrink: 0 }} />
+                <span>AI Scanner Active: Calculating ATS metrics, keyword overlap, and bullet point enhancements...</span>
               </div>
-            ) : (
-              <>
-                {/* Hero ATS Score & Breakdown Card */}
+            )}
+
+            {/* Error notice if scan failed */}
+            {atsScanError && (
+              <div style={{
+                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+                borderRadius: '12px', padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                color: '#fca5a5', fontSize: '0.88rem', flexWrap: 'wrap', gap: '10px'
+              }}>
+                <span>⚠️ {atsScanError}</span>
+                <button
+                  onClick={() => runAtsScan(getEffectiveResumeText(), jobDescriptionInput)}
+                  style={{
+                    background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '8px',
+                    fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer'
+                  }}
+                >
+                  Retry Scan
+                </button>
+              </div>
+            )}
+
+            {/* Hero ATS Score & Breakdown Card */}
+            <div style={{
+              background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', padding: '28px',
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '28px', alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                <ScoreRing value={atsScore} label="ATS Score" color={scoreColor} size={130} />
                 <div style={{
-                  background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', padding: '28px',
-                  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '28px', alignItems: 'center'
+                  marginTop: '12px', fontSize: '0.78rem', fontWeight: 700, padding: '4px 12px',
+                  borderRadius: '20px', background: `${scoreColor}15`, border: `1px solid ${scoreColor}40`,
+                  color: scoreColor, textAlign: 'center'
                 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                    <ScoreRing value={atsScore} label="ATS Score" color={scoreColor} size={130} />
-                    <div style={{
-                      marginTop: '12px', fontSize: '0.78rem', fontWeight: 700, padding: '4px 12px',
-                      borderRadius: '20px', background: `${scoreColor}15`, border: `1px solid ${scoreColor}40`,
-                      color: scoreColor, textAlign: 'center'
-                    }}>
-                      {scoreStatus}
+                  {scoreStatus}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                  ATS Scoring Breakdown
+                </div>
+                {[
+                  { label: 'Keyword Match', val: breakdown.keywordsMatch, color: '#6366f1' },
+                  { label: 'Formatting & Structure', val: breakdown.formattingAndStructure, color: '#10b981' },
+                  { label: 'Quantifiable Impact & Metrics', val: breakdown.quantifiableImpact, color: '#f59e0b' },
+                  { label: 'Experience & Role Relevance', val: breakdown.experienceRelevance, color: '#0ea5e9' }
+                ].map(item => (
+                  <div key={item.label}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px' }}>
+                      <span style={{ color: '#cbd5e1', fontWeight: 600 }}>{item.label}</span>
+                      <span style={{ color: item.color, fontWeight: 700 }}>{item.val}%</span>
+                    </div>
+                    <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ width: `${item.val}%`, height: '100%', background: item.color, borderRadius: '4px', transition: 'width 0.8s ease' }} />
                     </div>
                   </div>
+                ))}
+              </div>
+            </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                      ATS Scoring Breakdown
-                    </div>
-                    {[
-                      { label: 'Keyword Match', val: breakdown.keywordsMatch, color: '#6366f1' },
-                      { label: 'Formatting & Structure', val: breakdown.formattingAndStructure, color: '#10b981' },
-                      { label: 'Quantifiable Impact & Metrics', val: breakdown.quantifiableImpact, color: '#f59e0b' },
-                      { label: 'Experience & Role Relevance', val: breakdown.experienceRelevance, color: '#0ea5e9' }
-                    ].map(item => (
-                      <div key={item.label}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px' }}>
-                          <span style={{ color: '#cbd5e1', fontWeight: 600 }}>{item.label}</span>
-                          <span style={{ color: item.color, fontWeight: 700 }}>{item.val}%</span>
-                        </div>
-                        <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ width: `${item.val}%`, height: '100%', background: item.color, borderRadius: '4px', transition: 'width 0.8s ease' }} />
-                        </div>
-                      </div>
+            {/* AI Executive Summary */}
+            {activeAnalysis?.summary && (
+              <div style={{
+                background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)',
+                borderRadius: '14px', padding: '18px 22px', display: 'flex', gap: '14px', alignItems: 'flex-start'
+              }}>
+                <FaBrain style={{ color: '#818cf8', fontSize: '1.3rem', flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: 700, color: '#a5b4fc', fontSize: '0.92rem', marginBottom: '4px' }}>AI Match Assessment</div>
+                  <div style={{ color: '#cbd5e1', fontSize: '0.88rem', lineHeight: 1.6 }}>{activeAnalysis.summary}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Target Job Description Match Scanner */}
+            <div style={{
+              background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '16px', padding: '24px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <FaBullseye style={{ color: '#ec4899', fontSize: '1.1rem' }} />
+                <span style={{ fontWeight: 700, color: '#f1f5f9', fontSize: '1.05rem' }}>Scan Against a Target Job Description</span>
+              </div>
+              <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '14px' }}>
+                Paste a job posting or target role requirements to compute exact keyword overlaps and pinpoint what's missing.
+              </div>
+              <textarea
+                rows={4}
+                value={jobDescriptionInput}
+                onChange={(e) => setJobDescriptionInput(e.target.value)}
+                placeholder="Paste job description here (e.g. Senior Full Stack Engineer: React, TypeScript, Node.js, AWS, Kubernetes, GraphQL, CI/CD, Microservices...)"
+                style={{
+                  width: '100%', padding: '12px 16px', borderRadius: '10px',
+                  border: '1px solid rgba(99,102,241,0.25)', background: 'rgba(15,23,42,0.8)',
+                  color: '#e2e8f0', fontSize: '0.88rem', outline: 'none', resize: 'vertical',
+                  lineHeight: 1.5, boxSizing: 'border-box'
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+                <button
+                  onClick={() => runAtsScan(getEffectiveResumeText(), jobDescriptionInput)}
+                  disabled={isAnalyzingAts}
+                  style={{
+                    padding: '10px 22px', borderRadius: '10px', border: 'none',
+                    background: 'linear-gradient(135deg, #ec4899, #be185d)',
+                    color: '#fff', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    boxShadow: '0 0 18px rgba(236,72,153,0.35)', transition: 'all 0.2s'
+                  }}
+                >
+                  {isAnalyzingAts ? <><FaSpinner className="rai-spin" /> Scanning JD...</> : <><FaSearch /> Scan Job Description</>}
+                </button>
+              </div>
+            </div>
+
+            {/* Keyword Intelligence: Matched vs Missing */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+              {/* Matched Keywords */}
+              <div style={{
+                background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(16,185,129,0.25)',
+                borderRadius: '16px', padding: '22px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34d399', fontWeight: 700, fontSize: '0.95rem' }}>
+                    <FaCheck style={{ color: '#10b981' }} /> Matched ATS Keywords
+                  </div>
+                  <span style={{ background: 'rgba(16,185,129,0.2)', color: '#6ee7b7', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
+                    {activeAnalysis?.matchedKeywords?.length || 0}
+                  </span>
+                </div>
+                {activeAnalysis?.matchedKeywords?.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {activeAnalysis.matchedKeywords.map((kw, i) => (
+                      <span key={i} style={{
+                        padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600,
+                        background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', color: '#6ee7b7'
+                      }}>
+                        ✓ {kw}
+                      </span>
                     ))}
                   </div>
-                </div>
-
-                {/* AI Executive Summary */}
-                {atsAnalysis?.summary && (
-                  <div style={{
-                    background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)',
-                    borderRadius: '14px', padding: '18px 22px', display: 'flex', gap: '14px', alignItems: 'flex-start'
-                  }}>
-                    <FaBrain style={{ color: '#818cf8', fontSize: '1.3rem', flexShrink: 0, marginTop: '2px' }} />
-                    <div>
-                      <div style={{ fontWeight: 700, color: '#a5b4fc', fontSize: '0.92rem', marginBottom: '4px' }}>AI Match Assessment</div>
-                      <div style={{ color: '#cbd5e1', fontSize: '0.88rem', lineHeight: 1.6 }}>{atsAnalysis.summary}</div>
-                    </div>
-                  </div>
+                ) : (
+                  <div style={{ color: '#64748b', fontSize: '0.85rem' }}>No major technical keywords detected in resume text.</div>
                 )}
+              </div>
 
-                {/* Target Job Description Match Scanner */}
-                <div style={{
-                  background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: '16px', padding: '24px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                    <FaBullseye style={{ color: '#ec4899', fontSize: '1.1rem' }} />
-                    <span style={{ fontWeight: 700, color: '#f1f5f9', fontSize: '1.05rem' }}>Scan Against a Target Job Description</span>
+              {/* Missing Keywords */}
+              <div style={{
+                background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(244,63,94,0.25)',
+                borderRadius: '16px', padding: '22px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fb7185', fontWeight: 700, fontSize: '0.95rem' }}>
+                    <FaTimes style={{ color: '#f43f5e' }} /> Missing High-Impact Keywords
                   </div>
-                  <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '14px' }}>
-                    Paste a job posting or target role requirements to compute exact keyword overlaps and pinpoint what's missing.
-                  </div>
-                  <textarea
-                    rows={4}
-                    value={jobDescriptionInput}
-                    onChange={(e) => setJobDescriptionInput(e.target.value)}
-                    placeholder="Paste job description here (e.g. Senior Full Stack Engineer: React, TypeScript, Node.js, AWS, Kubernetes, GraphQL, CI/CD, Microservices...)"
-                    style={{
-                      width: '100%', padding: '12px 16px', borderRadius: '10px',
-                      border: '1px solid rgba(99,102,241,0.25)', background: 'rgba(15,23,42,0.8)',
-                      color: '#e2e8f0', fontSize: '0.88rem', outline: 'none', resize: 'vertical',
-                      lineHeight: 1.5, boxSizing: 'border-box'
-                    }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
-                    <button
-                      onClick={() => runAtsScan(resumeData?.rawText, jobDescriptionInput)}
-                      disabled={isAnalyzingAts}
-                      style={{
-                        padding: '10px 22px', borderRadius: '10px', border: 'none',
-                        background: 'linear-gradient(135deg, #ec4899, #be185d)',
-                        color: '#fff', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', gap: '8px',
-                        boxShadow: '0 0 18px rgba(236,72,153,0.35)', transition: 'all 0.2s'
-                      }}
-                    >
-                      {isAnalyzingAts ? <><FaSpinner className="rai-spin" /> Scanning JD...</> : <><FaSearch /> Scan Job Description</>}
-                    </button>
-                  </div>
+                  <span style={{ background: 'rgba(244,63,94,0.2)', color: '#fda4af', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
+                    {activeAnalysis?.missingKeywords?.length || 0}
+                  </span>
                 </div>
-
-                {/* Keyword Intelligence: Matched vs Missing */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-                  {/* Matched Keywords */}
-                  <div style={{
-                    background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(16,185,129,0.25)',
-                    borderRadius: '16px', padding: '22px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34d399', fontWeight: 700, fontSize: '0.95rem' }}>
-                        <FaCheck style={{ color: '#10b981' }} /> Matched ATS Keywords
-                      </div>
-                      <span style={{ background: 'rgba(16,185,129,0.2)', color: '#6ee7b7', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
-                        {atsAnalysis?.matchedKeywords?.length || 0}
+                {activeAnalysis?.missingKeywords?.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {activeAnalysis.missingKeywords.map((kw, i) => (
+                      <span key={i} style={{
+                        padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600,
+                        background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.3)', color: '#fda4af'
+                      }}>
+                        + {kw}
                       </span>
-                    </div>
-                    {atsAnalysis?.matchedKeywords?.length > 0 ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        {atsAnalysis.matchedKeywords.map((kw, i) => (
-                          <span key={i} style={{
-                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600,
-                            background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', color: '#6ee7b7'
-                          }}>
-                            ✓ {kw}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ color: '#64748b', fontSize: '0.85rem' }}>No major technical keywords detected in resume text.</div>
-                    )}
+                    ))}
                   </div>
-
-                  {/* Missing Keywords */}
-                  <div style={{
-                    background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(244,63,94,0.25)',
-                    borderRadius: '16px', padding: '22px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fb7185', fontWeight: 700, fontSize: '0.95rem' }}>
-                        <FaTimes style={{ color: '#f43f5e' }} /> Missing High-Impact Keywords
-                      </div>
-                      <span style={{ background: 'rgba(244,63,94,0.2)', color: '#fda4af', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
-                        {atsAnalysis?.missingKeywords?.length || 0}
-                      </span>
-                    </div>
-                    {atsAnalysis?.missingKeywords?.length > 0 ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        {atsAnalysis.missingKeywords.map((kw, i) => (
-                          <span key={i} style={{
-                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600,
-                            background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.3)', color: '#fda4af'
-                          }}>
-                            + {kw}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ color: '#34d399', fontSize: '0.85rem' }}>All core high-impact keywords matched!</div>
-                    )}
-                    <div style={{ marginTop: '14px', fontSize: '0.76rem', color: '#94a3b8', lineHeight: 1.4 }}>
-                      💡 Tip: Incorporate these keywords into your skills list or project descriptions to satisfy automated resume screeners.
-                    </div>
-                  </div>
-                </div>
-
-                {/* Strengths & Weaknesses Analysis */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-                  {/* Strengths */}
-                  <div style={{
-                    background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '16px', padding: '22px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34d399', fontWeight: 700, fontSize: '0.95rem', marginBottom: '14px' }}>
-                      <FaCheckCircle style={{ color: '#10b981' }} /> Resume Strengths
-                    </div>
-                    <ul style={{ margin: 0, paddingLeft: '18px', color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.7 }}>
-                      {(atsAnalysis?.strengths || []).map((s, i) => (
-                        <li key={i} style={{ marginBottom: '6px' }}>{s}</li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Weaknesses & Critical Gaps */}
-                  <div style={{
-                    background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(245,158,11,0.25)',
-                    borderRadius: '16px', padding: '22px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fbbf24', fontWeight: 700, fontSize: '0.95rem', marginBottom: '14px' }}>
-                      <FaExclamationTriangle style={{ color: '#f59e0b' }} /> Weaknesses & Critical Gaps
-                    </div>
-                    <ul style={{ margin: 0, paddingLeft: '18px', color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.7 }}>
-                      {(atsAnalysis?.weaknesses || []).map((w, i) => (
-                        <li key={i} style={{ marginBottom: '6px' }}>{w}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Formatting Issues (if any) */}
-                {atsAnalysis?.formattingIssues?.length > 0 && (
-                  <div style={{
-                    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-                    borderRadius: '14px', padding: '18px 22px', display: 'flex', gap: '14px', alignItems: 'flex-start'
-                  }}>
-                    <FaFileSignature style={{ color: '#f87171', fontSize: '1.2rem', flexShrink: 0, marginTop: '2px' }} />
-                    <div>
-                      <div style={{ fontWeight: 700, color: '#fca5a5', fontSize: '0.92rem', marginBottom: '4px' }}>ATS Formatting & Parsing Warnings</div>
-                      <ul style={{ margin: 0, paddingLeft: '18px', color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.6 }}>
-                        {atsAnalysis.formattingIssues.map((issue, idx) => (
-                          <li key={idx}>{issue}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
+                ) : (
+                  <div style={{ color: '#34d399', fontSize: '0.85rem' }}>All core high-impact keywords matched!</div>
                 )}
+                <div style={{ marginTop: '14px', fontSize: '0.76rem', color: '#94a3b8', lineHeight: 1.4 }}>
+                  💡 Tip: Incorporate these keywords into your skills list or project descriptions to satisfy automated resume screeners.
+                </div>
+              </div>
+            </div>
 
-                {/* AI Bullet Point Optimizer (Google XYZ Formula) */}
-                {atsAnalysis?.bulletPointImprovements?.length > 0 && (
-                  <div style={{
-                    background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(99,102,241,0.25)',
-                    borderRadius: '16px', padding: '24px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                      <FaMagic style={{ color: '#a5b4fc', fontSize: '1.2rem' }} />
-                      <span style={{ fontWeight: 800, color: '#f1f5f9', fontSize: '1.1rem' }}>AI Bullet Point Optimizer (Google XYZ Formula)</span>
-                    </div>
-                    <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '20px' }}>
-                      Formulated as: <em>Accomplished [X] as measured by [Y], by doing [Z]</em>. Replaces passive phrases with measurable impact.
-                    </div>
+            {/* Strengths & Weaknesses Analysis */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+              {/* Strengths */}
+              <div style={{
+                background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '16px', padding: '22px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34d399', fontWeight: 700, fontSize: '0.95rem', marginBottom: '14px' }}>
+                  <FaCheckCircle style={{ color: '#10b981' }} /> Resume Strengths
+                </div>
+                <ul style={{ margin: 0, paddingLeft: '18px', color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.7 }}>
+                  {(activeAnalysis?.strengths || []).map((s, i) => (
+                    <li key={i} style={{ marginBottom: '6px' }}>{s}</li>
+                  ))}
+                </ul>
+              </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                      {atsAnalysis.bulletPointImprovements.map((item, idx) => (
+              {/* Weaknesses & Critical Gaps */}
+              <div style={{
+                background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(245,158,11,0.25)',
+                borderRadius: '16px', padding: '22px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fbbf24', fontWeight: 700, fontSize: '0.95rem', marginBottom: '14px' }}>
+                  <FaExclamationTriangle style={{ color: '#f59e0b' }} /> Weaknesses & Critical Gaps
+                </div>
+                <ul style={{ margin: 0, paddingLeft: '18px', color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.7 }}>
+                  {(activeAnalysis?.weaknesses || []).map((w, i) => (
+                    <li key={i} style={{ marginBottom: '6px' }}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Formatting Issues (if any) */}
+            {activeAnalysis?.formattingIssues?.length > 0 && (
+              <div style={{
+                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                borderRadius: '14px', padding: '18px 22px', display: 'flex', gap: '14px', alignItems: 'flex-start'
+              }}>
+                <FaFileSignature style={{ color: '#f87171', fontSize: '1.2rem', flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: 700, color: '#fca5a5', fontSize: '0.92rem', marginBottom: '4px' }}>ATS Formatting & Parsing Warnings</div>
+                  <ul style={{ margin: 0, paddingLeft: '18px', color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.6 }}>
+                    {activeAnalysis.formattingIssues.map((issue, idx) => (
+                      <li key={idx}>{issue}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* AI Bullet Point Optimizer (Google XYZ Formula) */}
+            {activeAnalysis?.bulletPointImprovements?.length > 0 && (
+              <div style={{
+                background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(99,102,241,0.25)',
+                borderRadius: '16px', padding: '24px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                  <FaMagic style={{ color: '#a5b4fc', fontSize: '1.2rem' }} />
+                  <span style={{ fontWeight: 800, color: '#f1f5f9', fontSize: '1.1rem' }}>AI Bullet Point Optimizer (Google XYZ Formula)</span>
+                </div>
+                <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '20px' }}>
+                  Formulated as: <em>Accomplished [X] as measured by [Y], by doing [Z]</em>. Replaces passive phrases with measurable impact.
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                  {activeAnalysis.bulletPointImprovements.map((item, idx) => (
                         <div key={idx} style={{
                           background: 'rgba(30,41,59,0.7)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)',
                           padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px'
@@ -1009,8 +1209,6 @@ export default function ResumeAI() {
                     Proceed to AI Interview Setup ➔
                   </button>
                 </div>
-              </>
-            )}
           </div>
         )}
 

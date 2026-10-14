@@ -6,7 +6,7 @@ const { readFallbackData, writeFallbackData } = require('../utils/dbFallback');
 const { runResumeUpload } = require('../config/multer');
 const { extractResumeText, cleanupUploadedFile } = require('../utils/fileUtils');
 const { parseResumeFallback, analyzeAtsFallback } = require('../utils/resumeParser');
-const { hasGeminiKey, hasXAIKey, callGeminiChat, callXAIChat, parseAiJsonSafely } = require('../utils/ai');
+const { hasGeminiKey, hasXAIKey, hasGroqKey, callGeminiChat, callXAIChat, parseAiJsonSafely } = require('../utils/ai');
 const { RAGEngine } = require('../utils/ragEngine');
 const { buildFallbackQuestions } = require('../utils/helpers');
 
@@ -450,10 +450,26 @@ const analyzeResumeATS = async (req, res) => {
       if (getIsMongoDBConnected()) {
         const doc = await ResumeData.findOne({ userId });
         textToAnalyze = doc?.rawText || '';
+        if (!textToAnalyze && doc) {
+          const parts = [];
+          if (doc.skills?.length) parts.push(`Skills:\n${doc.skills.join(', ')}`);
+          if (doc.experience?.length) parts.push(`Experience:\n${doc.experience.join('\n')}`);
+          if (doc.projects?.length) parts.push(`Projects:\n${doc.projects.join('\n')}`);
+          if (doc.education?.length) parts.push(`Education:\n${doc.education.join('\n')}`);
+          textToAnalyze = parts.join('\n\n');
+        }
       } else {
         const data = readFallbackData();
         const resume = (data.resumeData || []).find(r => r.userId === userId);
         textToAnalyze = resume?.rawText || '';
+        if (!textToAnalyze && resume) {
+          const parts = [];
+          if (resume.skills?.length) parts.push(`Skills:\n${resume.skills.join(', ')}`);
+          if (resume.experience?.length) parts.push(`Experience:\n${resume.experience.join('\n')}`);
+          if (resume.projects?.length) parts.push(`Projects:\n${resume.projects.join('\n')}`);
+          if (resume.education?.length) parts.push(`Education:\n${resume.education.join('\n')}`);
+          textToAnalyze = parts.join('\n\n');
+        }
       }
     }
 
@@ -463,7 +479,7 @@ const analyzeResumeATS = async (req, res) => {
 
     const fallbackAnalysis = analyzeAtsFallback(textToAnalyze, jobDescription, targetRole);
 
-    if (!hasGeminiKey() && !hasXAIKey()) {
+    if (!hasGeminiKey() && !hasXAIKey() && !hasGroqKey()) {
       return res.json({ success: true, analysis: fallbackAnalysis });
     }
 
@@ -510,13 +526,48 @@ Evaluate the resume and return ONLY a valid JSON object matching this exact stru
   ]
 }
 `;
-      let text;
-      if (hasGeminiKey()) {
-        text = await callGeminiChat(prompt);
-      } else {
-        text = await callXAIChat(prompt);
-      }
-      const analysis = parseAiJsonSafely(text, fallbackAnalysis);
+      // Call AI with a 9-second timeout so requests never hang
+      const aiPromise = (async () => {
+        if (hasGeminiKey()) {
+          return await callGeminiChat(prompt);
+        } else if (hasXAIKey()) {
+          return await callXAIChat(prompt);
+        } else {
+          const { callGroqChat } = require('../utils/ai');
+          return await callGroqChat(prompt);
+        }
+      })();
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('AI ATS analysis timed out (9s)')), 9000)
+      );
+
+      const text = await Promise.race([aiPromise, timeoutPromise]);
+      const aiResult = parseAiJsonSafely(text, fallbackAnalysis);
+
+      // Validate & sanitize: ensure every field has a proper non-zero value, merging with fallback
+      const safeNum = (v, fb) => (typeof v === 'number' && !isNaN(v) && v > 0) ? Math.min(100, Math.max(10, Math.round(v))) : fb;
+      const safeArr = (v, fb) => (Array.isArray(v) && v.length > 0) ? v : fb;
+      const safeStr = (v, fb) => (typeof v === 'string' && v.trim()) ? v.trim() : fb;
+      const safeBreakdown = aiResult?.scoreBreakdown || {};
+
+      const analysis = {
+        atsScore: safeNum(aiResult?.atsScore, fallbackAnalysis.atsScore),
+        scoreBreakdown: {
+          keywordsMatch: safeNum(safeBreakdown.keywordsMatch, fallbackAnalysis.scoreBreakdown.keywordsMatch),
+          formattingAndStructure: safeNum(safeBreakdown.formattingAndStructure, fallbackAnalysis.scoreBreakdown.formattingAndStructure),
+          quantifiableImpact: safeNum(safeBreakdown.quantifiableImpact, fallbackAnalysis.scoreBreakdown.quantifiableImpact),
+          experienceRelevance: safeNum(safeBreakdown.experienceRelevance, fallbackAnalysis.scoreBreakdown.experienceRelevance),
+        },
+        summary: safeStr(aiResult?.summary, fallbackAnalysis.summary),
+        matchedKeywords: safeArr(aiResult?.matchedKeywords, fallbackAnalysis.matchedKeywords),
+        missingKeywords: safeArr(aiResult?.missingKeywords, fallbackAnalysis.missingKeywords),
+        strengths: safeArr(aiResult?.strengths, fallbackAnalysis.strengths),
+        weaknesses: safeArr(aiResult?.weaknesses, fallbackAnalysis.weaknesses),
+        formattingIssues: Array.isArray(aiResult?.formattingIssues) ? aiResult.formattingIssues : fallbackAnalysis.formattingIssues,
+        bulletPointImprovements: safeArr(aiResult?.bulletPointImprovements, fallbackAnalysis.bulletPointImprovements),
+      };
+
       return res.json({ success: true, analysis });
     } catch (aiErr) {
       console.warn("AI ATS analysis error, using deterministic fallback:", aiErr.message);

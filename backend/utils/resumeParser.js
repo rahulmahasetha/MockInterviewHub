@@ -147,10 +147,20 @@ const parseResumeFallback = (text) => {
 };
 
 const STANDARD_TECH_KEYWORDS = [
-  "JavaScript", "TypeScript", "React", "Node.js", "Express", "Python", "SQL",
-  "MongoDB", "PostgreSQL", "Docker", "Kubernetes", "AWS", "Git", "REST",
-  "GraphQL", "CI/CD", "Redis", "HTML5", "CSS3", "Tailwind", "Jest",
-  "Microservices", "Linux", "Java", "C++", "Next.js", "Redux", "GCP", "Azure"
+  "JavaScript", "TypeScript", "React", "React.js", "Node.js", "Express", "Express.js",
+  "Python", "SQL", "MongoDB", "PostgreSQL", "MySQL", "Docker", "Kubernetes",
+  "AWS", "Git", "REST", "RESTful", "GraphQL", "CI/CD", "Redis", "HTML5", "HTML",
+  "CSS3", "CSS", "Tailwind", "Jest", "Microservices", "Linux", "Java", "C++", "C#",
+  "Next.js", "Redux", "GCP", "Azure", "Flask", "Django", "FastAPI", "Spring",
+  "Spring Boot", "Angular", "Vue", "Vue.js", "Svelte", "Go", "Golang", "Rust",
+  "Ruby", "Rails", "PHP", "Laravel", "Dart", "Flutter", "Swift", "Kotlin",
+  "PyTorch", "TensorFlow", "Keras", "Pandas", "NumPy", "Scikit-learn",
+  "OAuth", "JWT", "Firebase", "Supabase", "Terraform", "Ansible", "Jenkins",
+  "GitHub Actions", "Nginx", "Apache", "RabbitMQ", "Kafka", "Elasticsearch",
+  "Figma", "Webpack", "Vite", "Babel", "Sass", "SCSS", "Bootstrap",
+  "Material UI", "Chakra UI", "Prisma", "Sequelize", "Mongoose",
+  "WebSockets", "gRPC", "Agile", "Scrum", "Jira", "Confluence",
+  "CNN", "RNN", "LSTM", "NLP", "Computer Vision", "Deep Learning", "Machine Learning"
 ];
 
 const ACTION_VERBS = [
@@ -168,12 +178,32 @@ const analyzeAtsFallback = (rawText, jobDescription = '', targetRole = '') => {
   let targetKeywords = [];
   if (jobDescription && jobDescription.trim()) {
     const jdLower = jobDescription.toLowerCase();
+    // Match all known standard tech keywords that appear in the JD (case-insensitive)
     targetKeywords = STANDARD_TECH_KEYWORDS.filter(k => jdLower.includes(k.toLowerCase()));
-    if (targetKeywords.length < 5) {
-      const jdWords = jobDescription.match(/\b[A-Z][a-zA-Z0-9+#.-]{1,20}\b/g) || [];
-      const additional = [...new Set(jdWords)].filter(w => !['The', 'And', 'For', 'With', 'You', 'Will', 'Are', 'Our', 'Job', 'Role', 'Requirements', 'Responsibilities'].includes(w));
-      targetKeywords = [...new Set([...targetKeywords, ...additional.slice(0, 8)])];
-    }
+
+    // Also extract capitalized tech-like words from the JD that aren't in our standard list
+    const STOP_WORDS = new Set([
+      'The', 'And', 'For', 'With', 'You', 'Will', 'Are', 'Our', 'Job', 'Role',
+      'Requirements', 'Responsibilities', 'About', 'Key', 'What', 'We', 'Offer',
+      'Company', 'Location', 'Duration', 'Start', 'This', 'Join', 'Work',
+      'Team', 'Experience', 'Knowledge', 'Skills', 'Preferred', 'Required',
+      'Bachelor', 'Master', 'Degree', 'Pursuing', 'Field', 'Qualifications',
+      'Opportunity', 'Development', 'Performance', 'Strong', 'Familiarity',
+      'Understanding', 'Basic', 'Working', 'Prior', 'Hands', 'Based',
+      'Proficiency', 'Ability', 'Troubleshoot', 'Participate', 'Collaborate',
+      'Design', 'Develop', 'Maintain', 'Manage', 'Deploy', 'Implement',
+      'Internship', 'Certificate', 'Mentorship', 'Stipend', 'Delhi', 'India',
+      'New', 'Private', 'Limited', 'Overview', 'Sectors', 'Multiple',
+      'On-site', 'Remote', 'Hybrid', 'Connaught', 'Place', 'Employment', 'Immediate',
+      'Type', 'Months', 'Month', 'Year', 'Years', 'Candidate', 'Candidates',
+      'Position', 'Positions', 'Office', 'Schedule', 'Salary', 'Pay', 'Package',
+      'Full-time', 'Part-time', 'Contract', 'Temporary', 'Fresher', 'Freshers',
+      'Per', 'Competitive', 'Fast-paced', 'Environment', 'Benefits', 'Culture',
+      'Equal', 'Employer', 'Apply', 'Contact', 'Email', 'Phone', 'Overview'
+    ]);
+    const jdWords = jobDescription.match(/\b[A-Z][a-zA-Z0-9+#._-]{1,25}\b/g) || [];
+    const additional = [...new Set(jdWords)].filter(w => !STOP_WORDS.has(w) && w.length > 1 && !/^\d+$/.test(w));
+    targetKeywords = [...new Set([...targetKeywords, ...additional.slice(0, 10)])];
   }
 
   if (targetKeywords.length === 0) {
