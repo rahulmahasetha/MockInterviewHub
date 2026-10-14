@@ -43,8 +43,11 @@ app.use('/quiz-categories', quizRoutes);
 app.use('/progress', progressRoutes);
 app.use('/leaderboard', leaderboardRoutes);
 app.use('/api/interview', interviewRoutes);
+app.use('/interview', interviewRoutes);
 app.use('/api/resume', resumeRoutes);
+app.use('/resume', resumeRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/admin', adminRoutes);
 
 // Start Express Server
 if (require.main === module) {

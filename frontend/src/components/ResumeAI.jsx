@@ -432,7 +432,15 @@ export default function ResumeAI() {
       }
     } catch (err) {
       console.warn("ATS scan error:", err.message);
-      setAtsScanError(err.response?.data?.error || err.message || 'ATS analysis timed out. Showing baseline score.');
+      let errMsg = err.response?.data?.error;
+      if (!errMsg) {
+        if (err.response?.status === 404) {
+          errMsg = 'Backend ATS endpoint returned 404. If running locally, please restart your backend server (run "npm start" in the backend directory) to load the new ATS route.';
+        } else {
+          errMsg = err.message || 'ATS analysis timed out. Showing baseline score.';
+        }
+      }
+      setAtsScanError(errMsg);
       if (!atsAnalysis && clientFallback) {
         setAtsAnalysis(clientFallback);
       }
