@@ -1,8 +1,12 @@
 name: CD Pipeline (Production Deployment)
 
 on:
-  push:
-    branches: [ main ]
+  workflow_run:
+    workflows: ["CI Pipeline (Frontend & Backend)"]
+    types:
+      - completed
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       target_env:
@@ -20,53 +24,12 @@ concurrency:
 
 jobs:
   # ============================================================================
-  # QUALITY GATE: Ensure tests pass and bundle builds before any deployment
-  # ============================================================================
-  verify-and-test:
-    name: Verify Quality Gates (Tests & Build)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js 22.x
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-          cache-dependency-path: |
-            backend/package-lock.json
-            frontend/package-lock.json
-
-      - name: Install & Test Backend
-        working-directory: backend
-        env:
-          CI: true
-          NODE_ENV: test
-          JWT_SECRET: test_jwt_secret_key_minimum_32_characters_for_ci
-          PORT: 3001
-        run: |
-          npm ci
-          npm test
-
-      - name: Install, Test & Build Frontend
-        working-directory: frontend
-        env:
-          CI: false
-          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://api.mockinterviewhub.com' }}
-        run: |
-          npm ci
-          npm run test:ci
-          npm run build
-
-  # ============================================================================
   # BACKEND DEPLOYMENT: Render / Railway Webhook + Health Check Probe
   # ============================================================================
   deploy-backend:
     name: Deploy Backend Service
-    needs: [verify-and-test]
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    environment: production
     steps:
       - name: Trigger Backend Deployment
         id: trigger_backend
@@ -89,8 +52,11 @@ jobs:
           fi
 
       - name: Verify Backend Health Probe
-        if: ${{ secrets.BACKEND_PRODUCTION_URL != '' }}
         run: |
+          if [ -z "${{ secrets.BACKEND_PRODUCTION_URL }}" ]; then
+            echo "ℹ️ Note: BACKEND_PRODUCTION_URL secret is not configured; skipping remote health probe."
+            exit 0
+          fi
           echo "🔍 Probing backend health check at ${{ secrets.BACKEND_PRODUCTION_URL }}/health..."
           ATTEMPTS=0
           MAX_ATTEMPTS=15
@@ -119,33 +85,32 @@ jobs:
   # ============================================================================
   deploy-frontend:
     name: Deploy Frontend Application
-    needs: [verify-and-test, deploy-backend]
+    needs: [deploy-backend]
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    environment: production
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Deploy to Vercel
-        id: deploy_vercel
-        if: ${{ secrets.VERCEL_TOKEN != '' }}
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
-          working-directory: ./frontend
-
-      - name: Trigger Vercel Deploy Hook (Alternative)
-        if: ${{ secrets.VERCEL_TOKEN == '' && secrets.VERCEL_FRONTEND_DEPLOY_HOOK_URL != '' }}
+      - name: Deploy Frontend to Vercel
         run: |
-          echo "🚀 Triggering Vercel deployment via Deploy Hook..."
-          curl -fsS -X POST "${{ secrets.VERCEL_FRONTEND_DEPLOY_HOOK_URL }}"
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "🚀 Deploying frontend to Vercel via Vercel CLI..."
+            npx --yes vercel --token "${{ secrets.VERCEL_TOKEN }}" --prod --yes ./frontend
+          elif [ -n "${{ secrets.VERCEL_FRONTEND_DEPLOY_HOOK_URL }}" ]; then
+            echo "🚀 Triggering Vercel deployment via Deploy Hook..."
+            curl -fsS -X POST "${{ secrets.VERCEL_FRONTEND_DEPLOY_HOOK_URL }}"
+          else
+            echo "ℹ️ Note: No Vercel deploy secret configured (VERCEL_TOKEN or VERCEL_FRONTEND_DEPLOY_HOOK_URL)."
+            echo "ℹ️ To automate frontend deployment, add your Vercel Token or Deploy Hook URL in GitHub Secrets."
+          fi
 
       - name: Verify Frontend Availability
-        if: ${{ secrets.FRONTEND_PRODUCTION_URL != '' }}
         run: |
+          if [ -z "${{ secrets.FRONTEND_PRODUCTION_URL }}" ]; then
+            echo "ℹ️ Note: FRONTEND_PRODUCTION_URL secret is not configured; skipping remote site probe."
+            exit 0
+          fi
           echo "🔍 Probing frontend production URL: ${{ secrets.FRONTEND_PRODUCTION_URL }}..."
           STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 "${{ secrets.FRONTEND_PRODUCTION_URL }}")
           if [ "$STATUS_CODE" -ge 200 ] && [ "$STATUS_CODE" -lt 400 ]; then
