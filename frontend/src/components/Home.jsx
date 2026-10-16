@@ -31,10 +31,6 @@ export default function Home() {
   const [categories, setCategories] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const [programmingExpanded, setProgrammingExpanded] = useState(true);
-  const [frontendExpanded, setFrontendExpanded] = useState(true);
-  const [backendExpanded, setBackendExpanded] = useState(true);
-  
   const [activeNav, setActiveNav] = useState("dashboard"); // Default to Dashboard View
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -44,10 +40,9 @@ export default function Home() {
   const rewardsHelpRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  // Sidebar Accordion State
-  const [sbProgExpanded, setSbProgExpanded] = useState(false);
-  const [sbFeExpanded, setSbFeExpanded] = useState(false);
-  const [sbBeExpanded, setSbBeExpanded] = useState(false);
+  // Dynamic Subject Area Accordions & Group States (10 Tracks)
+  const [groupExpanded, setGroupExpanded] = useState({});
+  const [sbAccordionOpen, setSbAccordionOpen] = useState({});
 
   // Profile View States
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -267,6 +262,8 @@ export default function Home() {
       setActiveNav('all');
     } else if (tab === 'dashboard') {
       setActiveNav('dashboard');
+    } else if (tab) {
+      setActiveNav(tab);
     }
   }, [location.search, progress?.username]);
 
@@ -281,21 +278,144 @@ export default function Home() {
 
   const [searchQuery, setSearchQuery] = useState("");
 
-  const PROGRAMMING_SLUGS = ["science", "jungle", "math", "history"];
-  const FRONTEND_SLUGS = ["html", "css", "react"];
-  const BACKEND_SLUGS = ["nodejs", "dsa"];
+  // ── 10 COMPREHENSIVE SUBJECT AREAS ──
+  const SUBJECT_AREAS = [
+    {
+      id: 'fe',
+      title: 'Frontend Engineering',
+      subtitle: 'HTML5, Modern CSS, JavaScript (ES6+) & React.js',
+      icon: '▭',
+      headerGrad: 'linear-gradient(135deg, #0f3d38, #0d766b, #0f9689)',
+      borderCol: '#99f6e4',
+      subBg: 'linear-gradient(135deg, #f0fdfa, #ecfdf5)',
+      subBorder: '#ccfbf1',
+      slugs: ['html', 'css', 'frontend-js', 'react'],
+      aliases: ['frontend']
+    },
+    {
+      id: 'be',
+      title: 'Backend Engineering',
+      subtitle: 'Node.js, Express REST APIs, SQL Databases & System Design',
+      icon: '◈',
+      headerGrad: 'linear-gradient(135deg, #431407, #9a3412, #c2410c)',
+      borderCol: '#fed7aa',
+      subBg: 'linear-gradient(135deg, #fff7ed, #fffbeb)',
+      subBorder: '#fed7aa',
+      slugs: ['nodejs', 'backend-express', 'backend-sql', 'backend-system-design'],
+      aliases: ['backend']
+    },
+    {
+      id: 'core',
+      title: 'Core Computer Science',
+      subtitle: 'Operating Systems (OS), DBMS Internals, Networks (CN) & OOP',
+      icon: '⚙️',
+      headerGrad: 'linear-gradient(135deg, #1e293b, #334155, #475569)',
+      borderCol: '#cbd5e1',
+      subBg: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
+      subBorder: '#e2e8f0',
+      slugs: ['core-os', 'core-dbms', 'core-cn', 'core-oop'],
+      aliases: ['core']
+    },
+    {
+      id: 'devops',
+      title: 'DevOps & Cloud Engineering',
+      subtitle: 'Docker, Kubernetes (K8s), CI/CD Automation & Linux Systems',
+      icon: '🚀',
+      headerGrad: 'linear-gradient(135deg, #064e3b, #047857, #10b981)',
+      borderCol: '#a7f3d0',
+      subBg: 'linear-gradient(135deg, #ecfdf5, #f0fdf4)',
+      subBorder: '#a7f3d0',
+      slugs: ['devops-docker', 'devops-k8s', 'devops-cicd', 'devops-linux'],
+      aliases: ['devops']
+    },
+    {
+      id: 'ai',
+      title: 'Artificial Intelligence (AI)',
+      subtitle: 'AI Foundations, Search Algorithms, Generative AI, LLMs & NLP',
+      icon: '🤖',
+      headerGrad: 'linear-gradient(135deg, #3b0764, #581c87, #7e22ce)',
+      borderCol: '#d8b4fe',
+      subBg: 'linear-gradient(135deg, #faf5ff, #f3e8ff)',
+      subBorder: '#e9d5ff',
+      slugs: ['ai-foundations', 'ai-llms', 'ai-nlp'],
+      aliases: ['ai']
+    },
+    {
+      id: 'ml',
+      title: 'Machine Learning (ML)',
+      subtitle: 'Supervised/Unsupervised Learning, Evaluation Metrics & Features',
+      icon: '🧠',
+      headerGrad: 'linear-gradient(135deg, #1e3a8a, #1d4ed8, #2563eb)',
+      borderCol: '#bfdbfe',
+      subBg: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
+      subBorder: '#bfdbfe',
+      slugs: ['ml-algorithms', 'ml-evaluation', 'ml-feature'],
+      aliases: ['ml']
+    },
+    {
+      id: 'dl',
+      title: 'Deep Learning (DL)',
+      subtitle: 'Artificial Neural Networks, Backprop, CNNs & Transformers',
+      icon: '⚡',
+      headerGrad: 'linear-gradient(135deg, #701a75, #a21caf, #c026d3)',
+      borderCol: '#f5d0fe',
+      subBg: 'linear-gradient(135deg, #fdf4ff, #fae8ff)',
+      subBorder: '#f5d0fe',
+      slugs: ['dl-neural-nets', 'dl-cnn-cv', 'dl-transformers'],
+      aliases: ['dl']
+    },
+    {
+      id: 'ds',
+      title: 'Data Science & Analytics',
+      subtitle: 'NumPy Vectorization, Pandas DataFrames, Statistics & EDA',
+      icon: '📊',
+      headerGrad: 'linear-gradient(135deg, #134e4a, #0f766e, #14b8a6)',
+      borderCol: '#99f6e4',
+      subBg: 'linear-gradient(135deg, #f0fdfa, #ccfbf1)',
+      subBorder: '#99f6e4',
+      slugs: ['ds-python', 'ds-stats', 'ds-eda'],
+      aliases: ['datascience', 'ds']
+    },
+    {
+      id: 'security',
+      title: 'Cyber Security & Threat Defense',
+      subtitle: 'OWASP Web Security, Cryptography, Firewalls & Network Defense',
+      icon: '🛡️',
+      headerGrad: 'linear-gradient(135deg, #7f1d1d, #b91c1c, #dc2626)',
+      borderCol: '#fecaca',
+      subBg: 'linear-gradient(135deg, #fef2f2, #fee2e2)',
+      subBorder: '#fecaca',
+      slugs: ['sec-web', 'sec-crypto', 'sec-network'],
+      aliases: ['security', 'cybersecurity']
+    },
+    {
+      id: 'prog',
+      title: 'Programming Foundations & DSA',
+      subtitle: 'Data Structures & Algorithms (DSA), Java, Python, C & C++',
+      icon: '🖋',
+      headerGrad: 'linear-gradient(135deg, #1e1b4b, #312e81, #4338ca)',
+      borderCol: '#c7d2fe',
+      subBg: 'linear-gradient(135deg, #eef2ff, #f5f3ff)',
+      subBorder: '#e0e7ff',
+      slugs: ['dsa', 'science', 'history', 'jungle', 'math'],
+      aliases: ['programming', 'prog']
+    }
+  ];
 
   const filteredCategories = categories.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.description.toLowerCase().includes(searchQuery.toLowerCase())
+    (c.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.label || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const programmingCategories = filteredCategories.filter(c => PROGRAMMING_SLUGS.includes(c.slug));
-  const frontendCategories = filteredCategories.filter(c => FRONTEND_SLUGS.includes(c.slug));
-  const backendCategories = filteredCategories.filter(c => BACKEND_SLUGS.includes(c.slug));
-
-  const totalScore = getTotalScore();
-  const completedSections = categories.filter(c => getCategoryProgress(c.slug).passed?.length > 0).length;
+  const getAreaCategories = (area) => {
+    return filteredCategories.filter(c => {
+      if (c.parentCategory && (c.parentCategory.toLowerCase() === area.id.toLowerCase() || area.aliases?.includes(c.parentCategory.toLowerCase()))) {
+        return true;
+      }
+      return area.slugs.includes(c.slug);
+    });
+  };
 
   const groupStats = cats => {
     const tLvl = cats.reduce((a, c) => a + (c.levels?.length || 0), 0);
@@ -304,16 +424,14 @@ export default function Home() {
     return { tLvl, cLvl, pct };
   };
 
-  const prog = groupStats(programmingCategories);
-  const fe = groupStats(frontendCategories);
-  const be = groupStats(backendCategories);
-
+  const totalScore = getTotalScore ? getTotalScore() : 0;
   const XP = totalScore > 0 ? totalScore : 1200;
   const LEVEL = Math.floor(XP / 200) + 1;
   const coinBalance = progress.coins || 0;
   const coinHistory = progress.coinHistory || [];
   const sortedLeaderboard = [...(globalLeaderboard || [])].sort((a, b) => (b.score || 0) - (a.score || 0));
   const leaderboardRank = progress?.username ? (sortedLeaderboard.findIndex(entry => entry.name === progress.username) + 1 || '-') : '-';
+  const completedSections = categories.filter(c => (getCategoryProgress(c.slug)?.passed?.length || 0) === (c.levels?.length || 0) && (c.levels?.length || 0) > 0).length;
 
   const handleReset = () => {
     if (window.confirm("Reset all progress?")) resetProgress();
@@ -449,118 +567,55 @@ export default function Home() {
           📄 Start Resume-Based Interview
         </button>
         
-        <div className="hd-nav-label">Subject Areas</div>
+        <div className="hd-nav-label">Subject Areas (10 Tracks)</div>
         
-        {/* Programming Accordion */}
-        <div className="hd-sb-accordion">
-          <button
-            className={`hd-nav-item hd-accordion-header ${sbProgExpanded ? 'expanded' : ''} ${activeNav === 'prog' ? 'active' : ''}`}
-            onClick={() => {
-              setSbProgExpanded(!sbProgExpanded);
-              setActiveNav('prog');
-              setProgrammingExpanded(true);
-            }}
-          >
-            <span className="acc-title">🖋 Programming</span>
-            <span className="acc-arrow">{sbProgExpanded ? '▼' : '▶'}</span>
-          </button>
-          <div className={`hd-accordion-body ${sbProgExpanded ? 'open' : ''}`}>
-            <div className="hd-accordion-inner">
-              {programmingCategories.map(c => (
-                <button
-                  key={c.slug}
-                  type="button"
-                  className="hd-acc-item"
-                  style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
-                  onClick={() => {
-                    closeSidebar();
-                    requireAuth(`/playground/${c.slug}`, () => navigate(`/playground/${c.slug}`), {
-                      title: 'Sign in to Start Quiz',
-                      subtitle: `Sign in or create an account to start the ${c.name} challenge.`
-                    });
-                  }}
-                >
-                  <span className="acc-dot" style={{ background: c.iconColor }}></span>
-                  <span className="acc-text">{c.name.replace(' Programming Quiz', '').replace(' Quiz', '')}</span>
-                </button>
-              ))}
+        {SUBJECT_AREAS.map(area => {
+          const areaCats = getAreaCategories(area);
+          const isOpen = sbAccordionOpen[area.id] ?? (activeNav === area.id);
+          return (
+            <div key={area.id} className="hd-sb-accordion">
+              <button
+                type="button"
+                className={`hd-nav-item hd-accordion-header ${isOpen ? 'expanded' : ''} ${activeNav === area.id ? 'active' : ''}`}
+                onClick={() => {
+                  setSbAccordionOpen(prev => ({ ...prev, [area.id]: !isOpen }));
+                  setActiveNav(area.id);
+                  setGroupExpanded(prev => ({ ...prev, [area.id]: true }));
+                }}
+              >
+                <span className="acc-title">{area.icon} {area.title}</span>
+                <span className="acc-arrow">{isOpen ? '▼' : '▶'}</span>
+              </button>
+              <div className={`hd-accordion-body ${isOpen ? 'open' : ''}`}>
+                <div className="hd-accordion-inner">
+                  {areaCats.map(c => (
+                    <button
+                      key={c.slug}
+                      type="button"
+                      className="hd-acc-item"
+                      style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+                      onClick={() => {
+                        closeSidebar();
+                        requireAuth(`/playground/${c.slug}`, () => navigate(`/playground/${c.slug}`), {
+                          title: 'Sign in to Start Quiz',
+                          subtitle: `Sign in or create an account to start the ${c.name} challenge.`
+                        });
+                      }}
+                    >
+                      <span className="acc-dot" style={{ background: c.iconColor || '#3b82f6' }}></span>
+                      <span className="acc-text">{c.name.replace(' Programming Quiz', '').replace(' Quiz', '')}</span>
+                    </button>
+                  ))}
+                  {areaCats.length === 0 && (
+                    <div style={{ padding: '8px 12px', fontSize: '0.8rem', color: '#94a3b8' }}>
+                      No matching quizzes
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-
-        {/* Frontend Accordion */}
-        <div className="hd-sb-accordion">
-          <button
-            className={`hd-nav-item hd-accordion-header ${sbFeExpanded ? 'expanded' : ''} ${activeNav === 'fe' ? 'active' : ''}`}
-            onClick={() => {
-              setSbFeExpanded(!sbFeExpanded);
-              setActiveNav('fe');
-              setFrontendExpanded(true);
-            }}
-          >
-            <span className="acc-title">▭ Frontend</span>
-            <span className="acc-arrow">{sbFeExpanded ? '▼' : '▶'}</span>
-          </button>
-          <div className={`hd-accordion-body ${sbFeExpanded ? 'open' : ''}`}>
-            <div className="hd-accordion-inner">
-              {frontendCategories.map(c => (
-                <button
-                  key={c.slug}
-                  type="button"
-                  className="hd-acc-item"
-                  style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
-                  onClick={() => {
-                    closeSidebar();
-                    requireAuth(`/playground/${c.slug}`, () => navigate(`/playground/${c.slug}`), {
-                      title: 'Sign in to Start Quiz',
-                      subtitle: `Sign in or create an account to start the ${c.name} challenge.`
-                    });
-                  }}
-                >
-                  <span className="acc-dot" style={{ background: c.iconColor }}></span>
-                  <span className="acc-text">{c.name.replace(' Programming Quiz', '').replace(' Quiz', '')}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Backend Accordion */}
-        <div className="hd-sb-accordion">
-          <button
-            className={`hd-nav-item hd-accordion-header ${sbBeExpanded ? 'expanded' : ''} ${activeNav === 'be' ? 'active' : ''}`}
-            onClick={() => {
-              setSbBeExpanded(!sbBeExpanded);
-              setActiveNav('be');
-              setBackendExpanded(true);
-            }}
-          >
-            <span className="acc-title">◈ Backend</span>
-            <span className="acc-arrow">{sbBeExpanded ? '▼' : '▶'}</span>
-          </button>
-          <div className={`hd-accordion-body ${sbBeExpanded ? 'open' : ''}`}>
-            <div className="hd-accordion-inner">
-              {backendCategories.map(c => (
-                <button
-                  key={c.slug}
-                  type="button"
-                  className="hd-acc-item"
-                  style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
-                  onClick={() => {
-                    closeSidebar();
-                    requireAuth(`/playground/${c.slug}`, () => navigate(`/playground/${c.slug}`), {
-                      title: 'Sign in to Start Quiz',
-                      subtitle: `Sign in or create an account to start the ${c.name} challenge.`
-                    });
-                  }}
-                >
-                  <span className="acc-dot" style={{ background: c.iconColor }}></span>
-                  <span className="acc-text">{c.name.replace(' Programming Quiz', '').replace(' Quiz', '')}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+          );
+        })}
 
         {!progress?.username && (
           <div className="hd-sidebar-guest-card">
@@ -1023,51 +1078,101 @@ export default function Home() {
             </div>
           )
         )}
-                {/* Category groups for activeNav === 'all' / 'prog' / 'fe' / 'be' */}
+                {/* Category groups for 10 Subject Areas */}
         {activeNav !== 'dashboard' && activeNav !== 'profile' && (
           <section className="hd-categories">
-            {(activeNav === 'all' || activeNav === 'prog') && (
-              <GroupBlock
-                title="Programming"
-                subtitle="Core programming language quizzes"
-                headerGrad="linear-gradient(135deg,#1e1b4b,#312e81,#4338ca)"
-                borderCol="#c7d2fe"
-                subBg="linear-gradient(135deg,#eef2ff,#f5f3ff)"
-                subBorder="#e0e7ff"
-                expanded={programmingExpanded}
-                setExpanded={setProgrammingExpanded}
-                stats={prog}
-                cats={programmingCategories}
-              />
-            )}
-            {(activeNav === 'all' || activeNav === 'fe') && (
-              <GroupBlock
-                title="Frontend"
-                subtitle="HTML, CSS & React"
-                headerGrad="linear-gradient(135deg,#0f3d38,#0d766b,#0f9689)"
-                borderCol="#99f6e4"
-                subBg="linear-gradient(135deg,#f0fdfa,#ecfdf5)"
-                subBorder="#ccfbf1"
-                expanded={frontendExpanded}
-                setExpanded={setFrontendExpanded}
-                stats={fe}
-                cats={frontendCategories}
-              />
-            )}
-            {(activeNav === 'all' || activeNav === 'be') && (
-              <GroupBlock
-                title="Backend"
-                subtitle="Node.js & Algorithms"
-                headerGrad="linear-gradient(135deg,#431407,#9a3412,#c2410c)"
-                borderCol="#fed7aa"
-                subBg="linear-gradient(135deg,#fff7ed,#fffbeb)"
-                subBorder="#fed7aa"
-                expanded={backendExpanded}
-                setExpanded={setBackendExpanded}
-                stats={be}
-                cats={backendCategories}
-              />
-            )}
+            {/* Subject Area Pill Filters */}
+            <div className="hd-subject-filter-bar">
+              <button
+                type="button"
+                className={`hd-filter-pill ${activeNav === 'all' ? 'active' : ''}`}
+                onClick={() => setActiveNav('all')}
+              >
+                🌐 All Tracks (10)
+              </button>
+              {SUBJECT_AREAS.map(area => {
+                const count = getAreaCategories(area).length;
+                return (
+                  <button
+                    key={area.id}
+                    type="button"
+                    className={`hd-filter-pill ${activeNav === area.id ? 'active' : ''}`}
+                    onClick={() => setActiveNav(area.id)}
+                  >
+                    <span>{area.icon}</span> {area.title.split(' ')[0]}
+                    <span className="hd-filter-pill-count">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {(() => {
+              const matchingAreas = SUBJECT_AREAS.filter(area => {
+                if (activeNav === 'all') return true;
+                return activeNav === area.id || area.aliases?.includes(activeNav);
+              });
+
+              const renderedBlocks = matchingAreas.map(area => {
+                const cats = getAreaCategories(area);
+                if (cats.length === 0) return null;
+                const stats = groupStats(cats);
+                const isExpanded = groupExpanded[area.id] ?? true;
+                return (
+                  <GroupBlock
+                    key={area.id}
+                    title={area.title}
+                    subtitle={area.subtitle}
+                    headerGrad={area.headerGrad}
+                    borderCol={area.borderCol}
+                    subBg={area.subBg}
+                    subBorder={area.subBorder}
+                    expanded={isExpanded}
+                    setExpanded={(setter) => {
+                      setGroupExpanded(prev => ({
+                        ...prev,
+                        [area.id]: typeof setter === 'function' ? setter(prev[area.id] ?? true) : setter
+                      }));
+                    }}
+                    stats={stats}
+                    cats={cats}
+                  />
+                );
+              }).filter(Boolean);
+
+              if (renderedBlocks.length === 0) {
+                return (
+                  <div className="hd-empty-search-state">
+                    <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🔍</div>
+                    <h3 style={{ fontSize: '1.2rem', color: '#1e293b', marginBottom: '8px' }}>
+                      No quizzes found {searchQuery ? `matching "${searchQuery}"` : 'in this track'}
+                    </h3>
+                    <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '16px' }}>
+                      Try adjusting your search terms or view all subject areas.
+                    </p>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          className="reward-secondary-btn"
+                          onClick={() => setSearchQuery("")}
+                        >
+                          Clear Search
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="reward-primary-btn"
+                        onClick={() => { setActiveNav('all'); setSearchQuery(""); }}
+                      >
+                        View All Tracks
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              return renderedBlocks;
+            })()}
           </section>
         )}
       </main>

@@ -64,10 +64,17 @@ export default function Dashboard() {
             
             {isCoursesOpen && (
               <div className="dash-nav-submenu">
-                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=prog')}>Programming</div>
-                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=fe')}>Frontend</div>
-                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=be')}>Backend</div>
-                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=all')}>All Categories</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=all')}>🌐 All Tracks (10)</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=fe')}>▭ Frontend</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=be')}>◈ Backend</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=core')}>⚙️ Core Computer Science</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=devops')}>🚀 DevOps & Cloud</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=ai')}>🤖 Artificial Intelligence</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=ml')}>🧠 Machine Learning</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=dl')}>⚡ Deep Learning</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=ds')}>📊 Data Science</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=security')}>🛡️ Cyber Security</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=prog')}>🖋 Programming & DSA</div>
               </div>
             )}
           </div>
@@ -111,10 +118,17 @@ export default function Dashboard() {
         </nav>
 
         <div className="dash-subject-areas">
-          <div className="dash-subject-title">SUBJECT AREAS</div>
-          <div className="dash-nav-item" onClick={() => navigate('/?tab=prog')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">✏️</span> Programming</div>
-          <div className="dash-nav-item" onClick={() => navigate('/?tab=fe')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">🖥️</span> Frontend</div>
-          <div className="dash-nav-item" onClick={() => navigate('/?tab=be')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">⚙️</span> Backend</div>
+          <div className="dash-subject-title">SUBJECT AREAS (10 TRACKS)</div>
+          <div className="dash-nav-item" onClick={() => navigate('/?tab=fe')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">▭</span> Frontend</div>
+          <div className="dash-nav-item" onClick={() => navigate('/?tab=be')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">◈</span> Backend</div>
+          <div className="dash-nav-item" onClick={() => navigate('/?tab=core')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">⚙️</span> Core CS (OS/DBMS/CN)</div>
+          <div className="dash-nav-item" onClick={() => navigate('/?tab=devops')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">🚀</span> DevOps & Cloud</div>
+          <div className="dash-nav-item" onClick={() => navigate('/?tab=ai')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">🤖</span> Artificial Intelligence</div>
+          <div className="dash-nav-item" onClick={() => navigate('/?tab=ml')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">🧠</span> Machine Learning</div>
+          <div className="dash-nav-item" onClick={() => navigate('/?tab=dl')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">⚡</span> Deep Learning</div>
+          <div className="dash-nav-item" onClick={() => navigate('/?tab=ds')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">📊</span> Data Science</div>
+          <div className="dash-nav-item" onClick={() => navigate('/?tab=security')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">🛡️</span> Cyber Security</div>
+          <div className="dash-nav-item" onClick={() => navigate('/?tab=prog')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">🖋</span> Programming & DSA</div>
         </div>
       </aside>
 

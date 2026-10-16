@@ -153,7 +153,7 @@ export default function Footer({ setActiveNav, navigate }) {
 
         {/* Skill Domains */}
         <div className="footer-links-col">
-          <h4 className="footer-col-title">Skill Domains</h4>
+          <h4 className="footer-col-title">Skill Tracks</h4>
           <ul className="footer-links-list">
             <li>
               <button 
@@ -161,7 +161,7 @@ export default function Footer({ setActiveNav, navigate }) {
                 className="footer-link-btn" 
                 onClick={() => handleNavClick('fe')}
               >
-                ⚛️ Frontend & React
+                ▭ Frontend Engineering
               </button>
             </li>
             <li>
@@ -170,20 +170,57 @@ export default function Footer({ setActiveNav, navigate }) {
                 className="footer-link-btn" 
                 onClick={() => handleNavClick('be')}
               >
-                🚀 Backend & Node.js
+                ◈ Backend & APIs
               </button>
             </li>
             <li>
               <button 
                 type="button" 
                 className="footer-link-btn" 
-                onClick={() => handleNavClick('prog')}
+                onClick={() => handleNavClick('core')}
               >
-                🐍 Core Programming
+                ⚙️ Core CS (OS, DBMS, CN)
               </button>
             </li>
             <li>
-              <span className="footer-tag-highlight">500+ Practice Questions</span>
+              <button 
+                type="button" 
+                className="footer-link-btn" 
+                onClick={() => handleNavClick('devops')}
+              >
+                🚀 DevOps & Docker / K8s
+              </button>
+            </li>
+            <li>
+              <button 
+                type="button" 
+                className="footer-link-btn" 
+                onClick={() => handleNavClick('ai')}
+              >
+                🤖 AI, ML & Deep Learning
+              </button>
+            </li>
+            <li>
+              <button 
+                type="button" 
+                className="footer-link-btn" 
+                onClick={() => handleNavClick('security')}
+              >
+                🛡️ Cyber Security Defense
+              </button>
+            </li>
+            <li>
+              <button 
+                type="button" 
+                className="footer-link-btn" 
+                onClick={() => handleNavClick('all')}
+                style={{ fontWeight: 600, color: '#60a5fa' }}
+              >
+                🌐 View All 10 Tracks →
+              </button>
+            </li>
+            <li>
+              <span className="footer-tag-highlight">10 Tracks • 36 Quizzes • 360 Levels</span>
             </li>
           </ul>
         </div>
