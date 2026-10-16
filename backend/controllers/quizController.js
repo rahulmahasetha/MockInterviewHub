@@ -1,11 +1,15 @@
 const QuizCategory = require('../models/QuizCategory');
 const { getIsMongoDBConnected } = require('../config/db');
-const { QUIZ_CATEGORIES } = require('../utils/seeder');
+const { QUIZ_CATEGORIES, seedQuizData } = require('../utils/seeder');
 
 const getCategories = async (req, res) => {
   if (getIsMongoDBConnected()) {
     try {
-      const categories = await QuizCategory.find().sort({ _id: 1 });
+      let categories = await QuizCategory.find().sort({ _id: 1 });
+      if (categories.length < QUIZ_CATEGORIES.length || categories.some(c => !c.parentCategory)) {
+        await seedQuizData();
+        categories = await QuizCategory.find().sort({ _id: 1 });
+      }
       return res.json(categories);
     } catch (err) {
       return res.status(500).json({ error: err.message });
