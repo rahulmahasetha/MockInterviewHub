@@ -28,6 +28,7 @@ export default function App() {
         pauseOnFocusLoss
         draggable
         pauseOnHover
+        style={{ zIndex: 999999 }}
       />
       <Routes>
         <Route path="/" element={<Home />} />

@@ -18,6 +18,7 @@ export default function AuthModal({ onAuthSuccess }) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Lock background scroll when modal is open and handle Escape key
@@ -55,6 +56,7 @@ export default function AuthModal({ onAuthSuccess }) {
       setUsername('');
       setEmail('');
       setPassword('');
+      setErrorMessage('');
       setIsSubmitting(false);
     }
   }, [authModalConfig?.isOpen]);
@@ -68,11 +70,12 @@ export default function AuthModal({ onAuthSuccess }) {
     const pw = password.trim();
 
     if (!u || !pw || ((activeTab === 'signup' || activeTab === 'forgot') && !em)) {
-      alert('Please fill in all required fields.');
+      setErrorMessage('Please fill in all required fields.');
       return;
     }
 
     setIsSubmitting(true);
+    setErrorMessage('');
     let result = null;
 
     try {
@@ -85,11 +88,13 @@ export default function AuthModal({ onAuthSuccess }) {
         if (result?.success) {
           setActiveTab('signin');
           setIsSubmitting(false);
+          setErrorMessage('');
           return;
         }
       }
 
       if (result?.success) {
+        setErrorMessage('');
         const target = authModalConfig.targetPath;
         closeAuthModal();
 
@@ -108,9 +113,12 @@ export default function AuthModal({ onAuthSuccess }) {
             navigate(target);
           }
         }
+      } else {
+        setErrorMessage(result?.error || 'Authentication failed. Please check your credentials.');
       }
     } catch (err) {
       console.error('Authentication error:', err);
+      setErrorMessage(err?.response?.data?.error || err.message || 'An unexpected error occurred.');
     } finally {
       setIsSubmitting(false);
     }
@@ -158,6 +166,7 @@ export default function AuthModal({ onAuthSuccess }) {
               onClick={() => {
                 setActiveTab('signin');
                 setPassword('');
+                setErrorMessage('');
               }}
             >
               Sign In
@@ -168,10 +177,18 @@ export default function AuthModal({ onAuthSuccess }) {
               onClick={() => {
                 setActiveTab('signup');
                 setPassword('');
+                setErrorMessage('');
               }}
             >
               Sign Up
             </button>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="hd-auth-error-alert" role="alert">
+            <span className="hd-auth-error-icon">⚠️</span>
+            <span className="hd-auth-error-text">{errorMessage}</span>
           </div>
         )}
 
@@ -182,7 +199,10 @@ export default function AuthModal({ onAuthSuccess }) {
               type="text"
               placeholder="Enter username"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                setErrorMessage('');
+              }}
               disabled={isSubmitting}
               required
               autoFocus
@@ -196,7 +216,10 @@ export default function AuthModal({ onAuthSuccess }) {
                 type="email"
                 placeholder="name@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setErrorMessage('');
+                }}
                 disabled={isSubmitting}
                 required
               />
@@ -210,7 +233,10 @@ export default function AuthModal({ onAuthSuccess }) {
                 <button
                   type="button"
                   className="hd-fpass-link"
-                  onClick={() => setActiveTab('forgot')}
+                  onClick={() => {
+                    setActiveTab('forgot');
+                    setErrorMessage('');
+                  }}
                 >
                   Forgot?
                 </button>
@@ -220,7 +246,10 @@ export default function AuthModal({ onAuthSuccess }) {
               type="password"
               placeholder={activeTab === 'forgot' ? 'Enter new password' : 'Enter password'}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setErrorMessage('');
+              }}
               disabled={isSubmitting}
               required
             />
