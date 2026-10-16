@@ -18,7 +18,8 @@ const ResumeInterviewSchema = new mongoose.Schema({
   sectionWisePerformance: { type: Object, default: {} },
   proctoringViolations: { type: Array, default: [] },
   hiringRecommendation: { type: String, default: '' },
-  qaList: { type: Array, default: [] }
+  qaList: { type: Array, default: [] },
+  coinsEarned: { type: Number, default: 0 }
 });
 
 module.exports = mongoose.models.ResumeInterview || mongoose.model('ResumeInterview', ResumeInterviewSchema);

@@ -14,7 +14,11 @@ const ProgressSchema = new mongoose.Schema({
   jungle: { passed: { type: [Number], default: [] }, score: { type: Number, default: 0 } },
   math: { passed: { type: [Number], default: [] }, score: { type: Number, default: 0 } },
   history: { passed: { type: [Number], default: [] }, score: { type: Number, default: 0 } },
-  highestScore: { type: Number, default: 0 }
+  highestScore: { type: Number, default: 0 },
+  coins: { type: Number, default: 0 },
+  streakDays: { type: Number, default: 1 },
+  lastLoginRewardDate: { type: String, default: null },
+  coinHistory: { type: Array, default: [] }
 });
 
 module.exports = mongoose.models.Progress || mongoose.model('Progress', ProgressSchema);

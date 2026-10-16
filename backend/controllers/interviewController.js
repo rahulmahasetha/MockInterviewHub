@@ -161,7 +161,7 @@ const evaluateInterview = async (req, res) => {
 
 const saveInterview = async (req, res) => {
   const { topic, overallScore, communicationScore, technicalScore, confidenceScore, feedbackSummary, strengths, areasForImprovement, questionCount } = req.body;
-  const userId = req.user.userId;
+  const userId = req.user?.userId || req.body?.userId;
   if (!userId) return res.status(400).json({ error: 'userId is required' });
 
   const entry = {
@@ -169,7 +169,9 @@ const saveInterview = async (req, res) => {
     communicationScore: communicationScore || 0, technicalScore: technicalScore || 0,
     confidenceScore: confidenceScore || 0, feedbackSummary: feedbackSummary || '',
     strengths: strengths || [], areasForImprovement: areasForImprovement || [],
-    questionCount: questionCount || 0, date: new Date()
+    questionCount: questionCount || 0,
+    coinsEarned: req.body.coinsEarned ?? Math.floor((overallScore || 0) / 10),
+    date: new Date()
   };
 
   if (getIsMongoDBConnected()) {
@@ -191,17 +193,17 @@ const saveInterview = async (req, res) => {
 };
 
 const getInterviewHistory = async (req, res) => {
-  const userId = req.user.userId;
+  const targetIds = [req.params.userId, req.user?.userId, req.query?.userId].filter(Boolean);
   if (getIsMongoDBConnected()) {
     try {
-      const results = await InterviewResult.find({ userId }).sort({ date: -1 }).limit(50);
+      const results = await InterviewResult.find({ userId: { $in: targetIds } }).sort({ date: -1 });
       res.json({ success: true, results });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   } else {
     const data = readFallbackData();
-    const results = (data.interviewResults || []).filter(r => r.userId === userId).sort((a, b) => new Date(b.date) - new Date(a.date));
+    const results = (data.interviewResults || []).filter(r => targetIds.includes(r.userId)).sort((a, b) => new Date(b.date) - new Date(a.date));
     res.json({ success: true, results });
   }
 };

@@ -11,7 +11,8 @@ const InterviewResultSchema = new mongoose.Schema({
   feedbackSummary: { type: String, default: '' },
   strengths: { type: [String], default: [] },
   areasForImprovement: { type: [String], default: [] },
-  questionCount: { type: Number, default: 0 }
+  questionCount: { type: Number, default: 0 },
+  coinsEarned: { type: Number, default: 0 }
 });
 
 module.exports = mongoose.models.InterviewResult || mongoose.model('InterviewResult', InterviewResultSchema);

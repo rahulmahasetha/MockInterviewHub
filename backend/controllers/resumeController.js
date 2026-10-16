@@ -395,9 +395,10 @@ Return ONLY JSON:
 
 const saveSession = async (req, res) => {
   const entry = req.body;
-  const userId = req.user.userId;
+  const userId = req.user?.userId || req.body?.userId;
   entry.userId = userId;
   if (!entry.userId) return res.status(400).json({ error: 'userId is required' });
+  entry.coinsEarned = req.body.coinsEarned ?? Math.floor((entry.overallScore || 0) / 10);
 
   if (getIsMongoDBConnected()) {
     try {
@@ -418,17 +419,17 @@ const saveSession = async (req, res) => {
 };
 
 const getSessionHistory = async (req, res) => {
-  const userId = req.user.userId;
+  const targetIds = [req.params.userId, req.user?.userId, req.query?.userId].filter(Boolean);
   if (getIsMongoDBConnected()) {
     try {
-      const results = await ResumeInterview.find({ userId }).sort({ date: -1 }).limit(20);
+      const results = await ResumeInterview.find({ userId: { $in: targetIds } }).sort({ date: -1 });
       res.json({ success: true, results });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   } else {
     const data = readFallbackData();
-    const results = (data.resumeInterviews || []).filter(r => r.userId === userId).sort((a, b) => new Date(b.date) - new Date(a.date));
+    const results = (data.resumeInterviews || []).filter(r => targetIds.includes(r.userId)).sort((a, b) => new Date(b.date) - new Date(a.date));
     res.json({ success: true, results });
   }
 };
