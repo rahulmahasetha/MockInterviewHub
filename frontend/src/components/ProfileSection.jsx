@@ -511,71 +511,6 @@ export default function ProfileSection({
     return items;
   }, [techMetrics.areas, resumeMetrics.areas, quizMetrics.areas, navigate, setActiveNav]);
 
-  // Gamification: Achievements
-  const achievements = useMemo(() => {
-    const hasFirstSession = completedSections > 0 || interviews.length > 0 || resumeInterviews.length > 0;
-    const hasTechAce = interviews.some(i => (i.overallScore || 0) >= 80);
-    const hasResumePro = resumeInterviews.some(r => (r.overallScore || 0) >= 80);
-    const hasStreak7 = (progress.streakDays || 1) >= 7;
-    const hasQuizChamp = completedSections >= 2;
-    const hasCoins50 = (progress.coins || 0) >= 50;
-
-    return [
-      {
-        id: 'ach-first',
-        icon: '🚀',
-        title: 'First Step',
-        desc: 'Complete your first quiz or mock interview session',
-        unlocked: hasFirstSession,
-        progressText: hasFirstSession ? 'Unlocked' : '0/1 session'
-      },
-      {
-        id: 'ach-tech-ace',
-        icon: '🎯',
-        title: 'Technical Ace',
-        desc: 'Score 80%+ on any Technical Mock Interview',
-        unlocked: hasTechAce,
-        progressText: hasTechAce
-          ? 'Unlocked'
-          : `${interviews.length > 0 ? Math.max(...interviews.map(i => i.overallScore || 0), 0) : 0}/80%`
-      },
-      {
-        id: 'ach-resume-pro',
-        icon: '📄',
-        title: 'Resume Master',
-        desc: 'Score 80%+ on a Resume-Based AI Interview',
-        unlocked: hasResumePro,
-        progressText: hasResumePro
-          ? 'Unlocked'
-          : `${resumeInterviews.length > 0 ? Math.max(...resumeInterviews.map(r => r.overallScore || 0), 0) : 0}/80%`
-      },
-      {
-        id: 'ach-streak',
-        icon: '🔥',
-        title: 'Streak Warrior',
-        desc: 'Maintain a 7-day daily learning streak',
-        unlocked: hasStreak7,
-        progressText: `${Math.min(progress.streakDays || 1, 7)}/7 days`
-      },
-      {
-        id: 'ach-quiz-champ',
-        icon: '🧠',
-        title: 'Quiz Champion',
-        desc: 'Successfully master 2 or more quiz categories',
-        unlocked: hasQuizChamp,
-        progressText: `${Math.min(completedSections, 2)}/2 categories`
-      },
-      {
-        id: 'ach-coins',
-        icon: '🪙',
-        title: 'Century Club',
-        desc: 'Accumulate 50 or more practice coins',
-        unlocked: hasCoins50,
-        progressText: `${Math.min(progress.coins || 0, 50)}/50 coins`
-      }
-    ];
-  }, [completedSections, interviews, resumeInterviews, progress.streakDays, progress.coins]);
-
   // SVG Chart Calculations for Chronological Attempts
   const chartData = useMemo(() => {
     if (chronologicalAttempts.length === 0) return null;
@@ -1681,45 +1616,6 @@ export default function ProfileSection({
         </div>
       </div>
 
-      {/* ── 7. ACHIEVEMENTS & MILESTONES ── */}
-      <div className="profile-achievements-section">
-        <div className="profile-card profile-card-stable">
-          <div className="card-header">
-            <div>
-              <h3>Achievements & Milestones</h3>
-              <p className="card-subtitle-muted">
-                Badges unlocked through practice consistency and high mock performance
-              </p>
-            </div>
-            <span className="card-header-badge">
-              {achievements.filter(a => a.unlocked).length} of {achievements.length} Unlocked
-            </span>
-          </div>
-
-          <div className="card-body">
-            <div className="achievements-showcase-grid">
-              {achievements.map(ach => (
-                <div
-                  key={ach.id}
-                  className={`achievement-card-box ${ach.unlocked ? 'unlocked' : 'locked'}`}
-                >
-                  <div className="ach-icon-wrap">{ach.icon}</div>
-                  <div className="ach-content-wrap">
-                    <div className="ach-title-row">
-                      <h4>{ach.title}</h4>
-                      <span className={`ach-status-pill ${ach.unlocked ? 'status-unlocked' : 'status-locked'}`}>
-                        {ach.unlocked ? 'Unlocked' : 'In Progress'}
-                      </span>
-                    </div>
-                    <p className="ach-desc">{ach.desc}</p>
-                    <div className="ach-progress-sub">{ach.progressText}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

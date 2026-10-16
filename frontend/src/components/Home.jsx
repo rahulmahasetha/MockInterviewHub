@@ -420,20 +420,6 @@ export default function Home() {
         >🗂 All Categories</button>
 
         <button
-          className={`hd-nav-item ${activeNav === 'profile' ? 'active' : ''}`}
-          onClick={() => {
-            closeSidebar();
-            requireAuth('profile', () => setActiveNav('profile'), {
-              title: 'Sign in to View Profile',
-              subtitle: 'Sign in or create an account to view your career readiness and interview history.'
-            });
-          }}
-          style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
-        >
-          👤 My Profile
-        </button>
-
-        <button
           type="button"
           className="hd-nav-item"
           onClick={() => {
@@ -610,7 +596,7 @@ export default function Home() {
           </button>
           <div className="hd-logo-nav">
             <span className="hd-logo-icon">🎓</span>
-            <span className="hd-logo-text-nav">EduQuest</span>
+            <span className="hd-logo-text-nav">MockInterviewHub</span>
           </div>
         </div>
         
@@ -885,7 +871,8 @@ export default function Home() {
                   });
                 }}
               >
-                👤 Profile
+                <span className="hd-profile-nav-icon">👤</span>
+                <span className="hd-profile-nav-text">Profile</span>
               </button>
               <button
                 type="button"
