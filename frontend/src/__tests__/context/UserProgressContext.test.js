@@ -56,24 +56,20 @@ describe('COIN_REWARDS constant', () => {
     });
   });
 
-  test('DAILY_LOGIN reward is 20 coins', () => {
-    expect(COIN_REWARDS.DAILY_LOGIN.coins).toBe(20);
+  test('DAILY_LOGIN reward is 5 coins', () => {
+    expect(COIN_REWARDS.DAILY_LOGIN.coins).toBe(5);
   });
 
-  test('COMPLETE_QUIZ reward is 10 coins', () => {
-    expect(COIN_REWARDS.COMPLETE_QUIZ.coins).toBe(10);
+  test('ANSWER_CORRECTLY reward is 1 coin', () => {
+    expect(COIN_REWARDS.ANSWER_CORRECTLY.coins).toBe(1);
   });
 
-  test('PERFECT_SCORE reward is 30 coins', () => {
-    expect(COIN_REWARDS.PERFECT_SCORE.coins).toBe(30);
+  test('SEVEN_DAY_STREAK reward is 25 coins', () => {
+    expect(COIN_REWARDS.SEVEN_DAY_STREAK.coins).toBe(25);
   });
 
-  test('SEVEN_DAY_STREAK reward is 100 coins', () => {
-    expect(COIN_REWARDS.SEVEN_DAY_STREAK.coins).toBe(100);
-  });
-
-  test('AI_MOCK_INTERVIEW reward is 100 coins', () => {
-    expect(COIN_REWARDS.AI_MOCK_INTERVIEW.coins).toBe(100);
+  test('INTERVIEW_SCORE reward is 1 coin per 10% score', () => {
+    expect(COIN_REWARDS.INTERVIEW_SCORE.coins).toBe(1);
   });
 });
 
@@ -159,5 +155,197 @@ describe('UserProgressProvider', () => {
         </UserProgressProvider>
       )
     ).not.toThrow();
+  });
+});
+
+describe('Simplified Gamification Rules & Duplicate Prevention', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  test('Daily login awards +5 coins on first claim of the day', () => {
+    let contextValue;
+    const Consumer = () => {
+      const { useUserProgress } = require('../../context/UserProgressContext');
+      contextValue = useUserProgress();
+      return null;
+    };
+
+    render(
+      <UserProgressProvider>
+        <Consumer />
+      </UserProgressProvider>
+    );
+
+    const { act } = require('@testing-library/react');
+    let claimed;
+    act(() => {
+      claimed = contextValue.claimDailyLoginReward();
+    });
+
+    expect(claimed).toBe(true);
+    expect(contextValue.progress.coins).toBe(5);
+    expect(contextValue.progress.streakDays).toBe(1);
+    expect(contextValue.progress.lastLoginRewardDate).toBeTruthy();
+  });
+
+  test('Prevents duplicate daily login reward on the same day', () => {
+    let contextValue;
+    const Consumer = () => {
+      const { useUserProgress } = require('../../context/UserProgressContext');
+      contextValue = useUserProgress();
+      return null;
+    };
+
+    render(
+      <UserProgressProvider>
+        <Consumer />
+      </UserProgressProvider>
+    );
+
+    const { act } = require('@testing-library/react');
+    act(() => {
+      contextValue.claimDailyLoginReward();
+    });
+
+    let secondClaim;
+    act(() => {
+      secondClaim = contextValue.claimDailyLoginReward();
+    });
+
+    expect(secondClaim).toBe(false);
+    expect(contextValue.progress.coins).toBe(5); // unchanged, no duplicate coins
+  });
+
+  test('Awards 7-day streak bonus (+25 coins) on reaching day 7', () => {
+    // Seed with 6-day streak ending yesterday
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    const seededState = {
+      userId: 'test_user',
+      coins: 30,
+      streakDays: 6,
+      lastLoginRewardDate: yesterdayStr,
+      coinHistory: []
+    };
+    localStorage.setItem('trivia_progress', JSON.stringify(seededState));
+
+    let contextValue;
+    const Consumer = () => {
+      const { useUserProgress } = require('../../context/UserProgressContext');
+      contextValue = useUserProgress();
+      return null;
+    };
+
+    render(
+      <UserProgressProvider>
+        <Consumer />
+      </UserProgressProvider>
+    );
+
+    const { act } = require('@testing-library/react');
+    act(() => {
+      contextValue.claimDailyLoginReward();
+    });
+
+    // 30 existing + 5 daily login + 25 7-day streak bonus = 60
+    expect(contextValue.progress.streakDays).toBe(7);
+    expect(contextValue.progress.coins).toBe(60);
+  });
+
+  test('Quiz correct answer awards exactly +1 coin and prevents duplicates', () => {
+    let contextValue;
+    const Consumer = () => {
+      const { useUserProgress } = require('../../context/UserProgressContext');
+      contextValue = useUserProgress();
+      return null;
+    };
+
+    render(
+      <UserProgressProvider>
+        <Consumer />
+      </UserProgressProvider>
+    );
+
+    const { act } = require('@testing-library/react');
+    act(() => {
+      contextValue.markPassed('science', 1, { points: 20 });
+    });
+
+    expect(contextValue.progress.coins).toBe(1);
+
+    // Answering the same level again should not award duplicate coins
+    act(() => {
+      contextValue.markPassed('science', 1, { points: 20 });
+    });
+
+    expect(contextValue.progress.coins).toBe(1);
+  });
+
+  test('Interview score percentage adds Math.floor(percentage / 10) coins (e.g. 77% -> 7 coins)', () => {
+    let contextValue;
+    const Consumer = () => {
+      const { useUserProgress } = require('../../context/UserProgressContext');
+      contextValue = useUserProgress();
+      return null;
+    };
+
+    render(
+      <UserProgressProvider>
+        <Consumer />
+      </UserProgressProvider>
+    );
+
+    const { act } = require('@testing-library/react');
+    const scorePercentage = 77;
+    const earnedCoins = Math.floor(scorePercentage / 10); // 7
+
+    act(() => {
+      contextValue.awardCoins('INTERVIEW_SCORE', {
+        coins: earnedCoins,
+        label: `Technical Interview (${scorePercentage}% score)`
+      });
+    });
+
+    expect(contextValue.progress.coins).toBe(7);
+    expect(contextValue.progress.coinHistory[0].coins).toBe(7);
+    expect(contextValue.progress.coinHistory[0].source).toBe('INTERVIEW_SCORE');
+  });
+
+  test('resetCoins resets all coins to 0 and records reset history', async () => {
+    const seededState = {
+      userId: 'test_user',
+      coins: 45,
+      streakDays: 3,
+      coinHistory: [{ id: 1, activity: 'Initial coins', coins: 45, date: 'today' }]
+    };
+    localStorage.setItem('trivia_progress', JSON.stringify(seededState));
+
+    let contextValue;
+    const Consumer = () => {
+      const { useUserProgress } = require('../../context/UserProgressContext');
+      contextValue = useUserProgress();
+      return null;
+    };
+
+    render(
+      <UserProgressProvider>
+        <Consumer />
+      </UserProgressProvider>
+    );
+
+    const { act } = require('@testing-library/react');
+    expect(contextValue.progress.coins).toBe(45);
+
+    await act(async () => {
+      await contextValue.resetCoins();
+    });
+
+    expect(contextValue.progress.coins).toBe(0);
+    expect(contextValue.progress.coinHistory[0].source).toBe('RESET');
+    expect(contextValue.progress.coinHistory[0].coins).toBe(0);
   });
 });

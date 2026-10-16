@@ -30,25 +30,10 @@ const initialProgressState = {
 };
 
 export const COIN_REWARDS = {
-  DAILY_LOGIN: { label: 'Daily Login', coins: 20 },
-  COMPLETE_QUIZ: { label: 'Complete a Quiz', coins: 10 },
-  PERFECT_SCORE: { label: 'Score 100%', coins: 30, suffix: 'Bonus' },
-  ANSWER_CORRECTLY: { label: 'Answer Correctly', coins: 5, suffix: 'question' },
-  FINISH_UNDER_TIME: { label: 'Finish Under Time', coins: 20 },
-  SEVEN_DAY_STREAK: { label: '7-Day Streak', coins: 100 },
-  THIRTY_DAY_STREAK: { label: '30-Day Streak', coins: 500 },
-  COMPLETE_TOPIC: { label: 'Complete a Topic', coins: 150 },
-  COMPLETE_ALL_LEVELS: { label: 'Complete All Levels', coins: 500 },
-  AI_MOCK_INTERVIEW: { label: 'AI Mock Interview Completed', coins: 100 },
-  EXCELLENT_INTERVIEW: { label: 'Excellent Interview Score (>90%)', coins: 150 },
-  FIRST_ATTEMPT_PERFECT: { label: 'First Attempt Perfect Score', coins: 50 },
-  NO_PROCTORING_VIOLATIONS: { label: 'No Proctoring Violations', coins: 30 },
-  REFER_FRIEND: { label: 'Refer a Friend', coins: 200 },
-  DAILY_CHALLENGE: { label: 'Complete Daily Challenge', coins: 75 },
-  WEEKLY_WINNER: { label: 'Weekly Challenge Winner', coins: 500 },
-  MONTHLY_TOP_10: { label: 'Monthly Leaderboard Top 10', coins: 1000 },
-  CODING_CHALLENGE: { label: 'Solve Coding Challenge', coins: 80 },
-  ACCURACY_STREAK: { label: 'Maintain 95% Accuracy (10 quizzes)', coins: 200 }
+  DAILY_LOGIN: { label: 'Daily Login', coins: 5 },
+  ANSWER_CORRECTLY: { label: 'Quiz Correct Answer', coins: 1, suffix: 'per question' },
+  SEVEN_DAY_STREAK: { label: '7-Day Streak Bonus', coins: 25 },
+  INTERVIEW_SCORE: { label: 'Interview Score Bonus', coins: 1, suffix: 'per 10% score' }
 };
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
@@ -77,6 +62,48 @@ export function UserProgressProvider({ children }) {
   const [globalLeaderboard, setGlobalLeaderboard] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Global Auth Modal State for Guest Browsing
+  const [authModalConfig, setAuthModalConfig] = useState({
+    isOpen: false,
+    targetPath: null,
+    title: '',
+    subtitle: ''
+  });
+
+  const openAuthModal = (targetPath = null, meta = {}) => {
+    setAuthModalConfig({
+      isOpen: true,
+      targetPath: targetPath || null,
+      title: meta?.title || '',
+      subtitle: meta?.subtitle || ''
+    });
+  };
+
+  const closeAuthModal = () => {
+    setAuthModalConfig({
+      isOpen: false,
+      targetPath: null,
+      title: '',
+      subtitle: ''
+    });
+  };
+
+  /**
+   * Guards protected actions.
+   * If logged in: executes actionCallback and returns true.
+   * If not logged in: opens AuthModal with targetPath & returns false.
+   */
+  const requireAuth = (targetPath = null, actionCallback = null, meta = {}) => {
+    if (progress && progress.username) {
+      if (typeof actionCallback === 'function') {
+        actionCallback();
+      }
+      return true;
+    }
+    openAuthModal(targetPath, meta);
+    return false;
+  };
+
   // Sync with localStorage & Backend
   useEffect(() => {
     localStorage.setItem("trivia_progress", JSON.stringify(progress));
@@ -90,7 +117,11 @@ export function UserProgressProvider({ children }) {
             jungle: progress.jungle,
             math: progress.math,
             history: progress.history,
-            highestScore: progress.highestScore
+            highestScore: progress.highestScore,
+            coins: progress.coins || 0,
+            streakDays: progress.streakDays || 1,
+            lastLoginRewardDate: progress.lastLoginRewardDate || null,
+            coinHistory: progress.coinHistory || []
           });
         } catch (error) {
           console.log('MongoDB progress sync failed, running in offline mode');
@@ -229,7 +260,11 @@ export function UserProgressProvider({ children }) {
           jungle: dbProgress.jungle || { passed: [], score: 0 },
           math: dbProgress.math || { passed: [], score: 0 },
           history: dbProgress.history || { passed: [], score: 0 },
-          highestScore: dbProgress.highestScore || 0
+          highestScore: dbProgress.highestScore || 0,
+          coins: dbProgress.coins ?? 0,
+          streakDays: dbProgress.streakDays ?? 1,
+          lastLoginRewardDate: dbProgress.lastLoginRewardDate ?? null,
+          coinHistory: Array.isArray(dbProgress.coinHistory) ? dbProgress.coinHistory : []
         };
         toast.success(`Welcome back, ${username}! Progress synchronized.`);
       } else {
@@ -293,14 +328,16 @@ export function UserProgressProvider({ children }) {
 
   const awardCoins = (rewardKey, details = {}) => {
     const reward = COIN_REWARDS[rewardKey];
-    if (!reward) return;
+    const amount = details.coins ?? reward?.coins ?? 0;
+    if (amount <= 0) return;
+
+    const label = details.label || reward?.label || rewardKey;
 
     setProgress(prev => {
-      const amount = details.coins ?? reward.coins;
       const nextHistory = [
         {
           id: Date.now() + Math.floor(Math.random() * 1000),
-          activity: details.label || reward.label,
+          activity: label,
           coins: amount,
           source: rewardKey,
           date: formatScoreTimestamp()
@@ -315,7 +352,13 @@ export function UserProgressProvider({ children }) {
       };
     });
 
-    toast.success(`+${details.coins ?? reward.coins} coins: ${details.label || reward.label}`);
+    toast.success(`+${amount} coins: ${label}`);
+  };
+
+  const getYesterdayKey = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
   };
 
   const claimDailyLoginReward = () => {
@@ -325,12 +368,54 @@ export function UserProgressProvider({ children }) {
       return false;
     }
 
+    const yesterday = getYesterdayKey();
+    let newStreak = 1;
+    if (progress.lastLoginRewardDate === yesterday) {
+      newStreak = (progress.streakDays || 1) + 1;
+    } else if (progress.lastLoginRewardDate && progress.lastLoginRewardDate !== today) {
+      newStreak = 1;
+    } else {
+      newStreak = 1;
+    }
+
+    const isSevenDayStreak = (newStreak % 7 === 0);
+    const loginRewardCoins = COIN_REWARDS.DAILY_LOGIN.coins; // 5 coins
+    const streakBonusCoins = isSevenDayStreak ? COIN_REWARDS.SEVEN_DAY_STREAK.coins : 0; // 25 coins
+    const totalAward = loginRewardCoins + streakBonusCoins;
+
+    const newHistoryEntries = [
+      {
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        activity: 'Daily Login',
+        coins: loginRewardCoins,
+        source: 'DAILY_LOGIN',
+        date: formatScoreTimestamp()
+      }
+    ];
+
+    if (isSevenDayStreak) {
+      newHistoryEntries.unshift({
+        id: Date.now() + Math.floor(Math.random() * 1000) + 1,
+        activity: `7-Day Streak Bonus (${newStreak} days)`,
+        coins: streakBonusCoins,
+        source: 'SEVEN_DAY_STREAK',
+        date: formatScoreTimestamp()
+      });
+    }
+
     setProgress(prev => ({
       ...prev,
       lastLoginRewardDate: today,
-      streakDays: Math.max(prev.streakDays || 1, 1)
+      streakDays: newStreak,
+      coins: (prev.coins || 0) + totalAward,
+      coinHistory: [...newHistoryEntries, ...(prev.coinHistory || [])].slice(0, 30)
     }));
-    awardCoins('DAILY_LOGIN');
+
+    toast.success(`+${loginRewardCoins} coins: Daily Login`);
+    if (isSevenDayStreak) {
+      toast.success(`🔥 +${streakBonusCoins} coins: 7-Day Streak Milestone!`);
+    }
+
     return true;
   };
 
@@ -350,34 +435,22 @@ export function UserProgressProvider({ children }) {
       const newPassed = [...new Set([...categoryProgress.passed, levelIndex])];
       const scoreIncrement = rewardMeta.points ?? rewardMeta.scoreIncrement ?? 20;
       const newScore = categoryProgress.score + scoreIncrement;
-      const isTopicComplete = rewardMeta.totalLevels && newPassed.length >= rewardMeta.totalLevels;
-      const rewardEntries = [
-        { key: 'ANSWER_CORRECTLY', label: `${category} level ${level} correct`, coins: COIN_REWARDS.ANSWER_CORRECTLY.coins },
-        { key: 'COMPLETE_QUIZ', label: `Completed ${category} level ${level}`, coins: COIN_REWARDS.COMPLETE_QUIZ.coins }
-      ];
 
-      if (rewardMeta.finishedUnderTime) {
-        rewardEntries.push({ key: 'FINISH_UNDER_TIME', label: `Finished ${category} level ${level} under time`, coins: COIN_REWARDS.FINISH_UNDER_TIME.coins });
-      }
-
-      if (isTopicComplete) {
-        rewardEntries.push({ key: 'COMPLETE_TOPIC', label: `Completed ${category} topic`, coins: COIN_REWARDS.COMPLETE_TOPIC.coins });
-        rewardEntries.push({ key: 'COMPLETE_ALL_LEVELS', label: `Completed all ${category} levels`, coins: COIN_REWARDS.COMPLETE_ALL_LEVELS.coins });
-      }
-
-      const earnedCoins = rewardEntries.reduce((total, reward) => total + reward.coins, 0);
+      // Only rule for quizzes: Correct answer quize: + 1coins
+      const earnedCoins = COIN_REWARDS.ANSWER_CORRECTLY.coins;
+      const rewardEntry = {
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        activity: `Quiz correct answer (${category} L${level})`,
+        coins: earnedCoins,
+        source: 'ANSWER_CORRECTLY',
+        date: formatScoreTimestamp()
+      };
 
       const updatedProgress = {
         ...prev,
         coins: (prev.coins || 0) + earnedCoins,
         coinHistory: [
-          ...rewardEntries.map(reward => ({
-            id: Date.now() + Math.floor(Math.random() * 1000) + Math.floor(Math.random() * 1000),
-            activity: reward.label,
-            coins: reward.coins,
-            source: reward.key,
-            date: formatScoreTimestamp()
-          })),
+          rewardEntry,
           ...(prev.coinHistory || [])
         ].slice(0, 30),
         categories: {
@@ -402,7 +475,7 @@ export function UserProgressProvider({ children }) {
         return total;
       }, 0);
 
-      toast.success(`+${earnedCoins} coins earned! Level ${level} completed.`);
+      toast.success(`+${earnedCoins} coin: Correct answer!`);
 
       return {
         ...updatedProgress,
@@ -473,6 +546,37 @@ export function UserProgressProvider({ children }) {
       }
     }
     toast.success('Progress reset successfully!');
+  };
+
+  const resetCoins = async () => {
+    const resetEntry = {
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      activity: 'Coins balance reset to 0',
+      coins: 0,
+      source: 'RESET',
+      date: formatScoreTimestamp()
+    };
+
+    const nextHistory = [resetEntry, ...(progress.coinHistory || [])].slice(0, 30);
+
+    setProgress(prev => ({
+      ...prev,
+      coins: 0,
+      coinHistory: [resetEntry, ...(prev.coinHistory || [])].slice(0, 30)
+    }));
+
+    if (progress.userId) {
+      try {
+        await userProgressAPI.updateProgress(progress.userId, {
+          coins: 0,
+          coinHistory: nextHistory
+        });
+      } catch (e) {
+        console.log('Failed to reset coins on server', e);
+      }
+    }
+    toast.success('All coins have been reset to 0!');
+    return { success: true };
   };
 
   const saveToLeaderboard = async (name, totalScore) => {
@@ -555,6 +659,7 @@ export function UserProgressProvider({ children }) {
         updateHighestScore,
         saveToLeaderboard,
         resetProgress,
+        resetCoins,
         awardCoins,
         claimDailyLoginReward,
         getTotalScore,
@@ -564,7 +669,11 @@ export function UserProgressProvider({ children }) {
         logoutUser,
         forgotPasswordUser,
         fetchGlobalLeaderboard,
-        updateUserProfile
+        updateUserProfile,
+        authModalConfig,
+        openAuthModal,
+        closeAuthModal,
+        requireAuth
       }}
     >
       {children}
