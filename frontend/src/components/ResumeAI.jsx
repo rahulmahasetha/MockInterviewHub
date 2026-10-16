@@ -97,7 +97,8 @@ const ScoreRing = ({ value = 0, label, color = '#6366f1', size = 90 }) => {
 
 export default function ResumeAI() {
   const navigate = useNavigate();
-  const { progress } = useUserProgress();
+  const { progress, awardCoins, requireAuth } = useUserProgress();
+  const hasAwardedCoinsRef = useRef(false);
   const [phase, setPhase] = useState('upload');
 
   const [file, setFile] = useState(null);
@@ -496,7 +497,15 @@ export default function ResumeAI() {
   };
 
   const startInterview = async () => {
+    if (!progress?.username) {
+      requireAuth('/resume-interview', startInterview, {
+        title: 'Sign in to Start Resume-Based Interview',
+        subtitle: 'Sign in or create an account to start your personalized resume interview.'
+      });
+      return;
+    }
     if (selectedCategories.length === 0) { alert('Please select at least one category.'); return; }
+    hasAwardedCoinsRef.current = false;
     setPhase('interview');
     setViolations(0);
     setQuestionQueue([]);
@@ -645,8 +654,20 @@ export default function ResumeAI() {
         setReport(rep);
         const avgScore = qaList.reduce((a, c) => a + c.score, 0) / (qaList.length || 1);
         const overallScore = Math.round(avgScore * 10);
+
+        // Gamification: Interview score based on percentage (e.g. 77% -> 7 coins)
+        const earnedCoins = Math.floor(overallScore / 10);
+        if (!hasAwardedCoinsRef.current && earnedCoins > 0) {
+          hasAwardedCoinsRef.current = true;
+          awardCoins('INTERVIEW_SCORE', {
+            coins: earnedCoins,
+            label: `Resume AI Interview (${overallScore}% score)`
+          });
+        }
+
         await resumeAPI.saveSession({
           userId: progress.userId, category: 'Resume AI Interview', difficulty, overallScore,
+          coinsEarned: earnedCoins,
           technicalScore: rep.technicalScore ?? overallScore,
           communicationScore: rep.communicationScore ?? overallScore,
           confidenceScore: rep.confidenceScore ?? overallScore,
@@ -1292,7 +1313,7 @@ export default function ResumeAI() {
                 boxShadow: '0 0 30px rgba(99,102,241,0.4)', transition: 'all 0.3s ease'
               }}
             >
-              {isGeneratingNext ? <><FaSpinner className="rai-spin" /> Preparing AI Interviewer...</> : <><FaRobot /> Start Proctored Interview</>}
+              {isGeneratingNext ? <><FaSpinner className="rai-spin" /> Preparing AI Interviewer...</> : <><FaRobot /> Start Resume-Based Interview</>}
             </button>
           </div>
         )}

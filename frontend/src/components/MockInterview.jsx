@@ -14,7 +14,7 @@ export default function MockInterview() {
   const [numQuestions, setNumQuestions] = useState(5);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { progress, awardCoins } = useUserProgress();
+  const { progress, awardCoins, requireAuth } = useUserProgress();
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState([]);
@@ -27,6 +27,7 @@ export default function MockInterview() {
   const [history, setHistory] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const recognitionRef = useRef(null);
+  const hasAwardedCoinsRef = useRef(false);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -106,10 +107,18 @@ export default function MockInterview() {
   }, [step]);
 
   const handleStart = async () => {
+    if (!progress?.username) {
+      requireAuth('/interview', handleStart, {
+        title: 'Sign in to Start Technical Interview',
+        subtitle: 'Sign in or create an account to start your AI-proctored technical interview.'
+      });
+      return;
+    }
     setIsLoading(true);
     try {
       const response = await interviewAPI.generateInterview({ topic, numQuestions });
       if (response.data.success && response.data.questions.length > 0) {
+        hasAwardedCoinsRef.current = false;
         setQuestions(response.data.questions);
         setUserAnswers(new Array(response.data.questions.length).fill(""));
         setViolations(0);
@@ -142,9 +151,16 @@ export default function MockInterview() {
           const totalScore = response.data.evaluation.reduce((acc, curr) => acc + (curr.score || 0), 0);
           const maxScore = questions.length * 10;
           const overallPercent = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
-          awardCoins('AI_MOCK_INTERVIEW');
-          if (overallPercent > 90) awardCoins('EXCELLENT_INTERVIEW');
-          if (violations === 0) awardCoins('NO_PROCTORING_VIOLATIONS');
+          
+          // Gamification: Interview score based on percentage (e.g. 77% -> 7 coins)
+          const earnedCoins = Math.floor(overallPercent / 10);
+          if (!hasAwardedCoinsRef.current && earnedCoins > 0) {
+            hasAwardedCoinsRef.current = true;
+            awardCoins('INTERVIEW_SCORE', {
+              coins: earnedCoins,
+              label: `Technical Interview (${overallPercent}% score)`
+            });
+          }
           
           if (progress?.username) {
             try {
@@ -300,7 +316,7 @@ export default function MockInterview() {
             </div>
 
             <button className="auth-submit-btn" onClick={handleStart} disabled={isLoading} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
-              {isLoading ? <><FaSpinner className="fa-spin" /> Generating Questions...</> : 'Start Interview'}
+              {isLoading ? <><FaSpinner className="fa-spin" /> Generating Questions...</> : 'Start Technical Interview'}
             </button>
 
             <div style={{ textAlign: 'center', marginTop: '20px' }}>

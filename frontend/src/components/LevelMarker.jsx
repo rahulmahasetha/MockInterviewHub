@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function LevelMarker({ level, locked, completed, current, onClick, style, category }) {
+export default function LevelMarker({ level, locked = false, completed, current, onClick, style, category }) {
   const getMarkerClass = () => {
     let className = 'level-marker';
     if (locked) className += ' locked';

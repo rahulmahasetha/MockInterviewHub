@@ -94,7 +94,7 @@ export default function MCQCard({ levelObj, category, onCorrectNextLevel, totalL
       )}
 
       <h3 className="mcq-question">
-        Level {levelObj.level}: {levelObj.question}
+        Question {levelObj.level}: {levelObj.question}
       </h3>
 
       <div className="mcq-options pill-options">
@@ -133,21 +133,21 @@ export default function MCQCard({ levelObj, category, onCorrectNextLevel, totalL
 
       {result === 'correct' && (
         <div className="mcq-result success">
-          Correct. Coins earned. {levelObj.level < totalLevels ? 'Moving to next level...' : 'Category completed.'}
+          Correct. Coins earned. {levelObj.level < totalLevels ? 'Moving to next question...' : 'Category completed.'}
         </div>
       )}
 
       {result === 'alreadyCompleted' && (
         <div className="mcq-result neutral">
           Correct. Already completed - no additional coins.
-          {levelObj.level < totalLevels && ' Moving to next level...'}
+          {levelObj.level < totalLevels && ' Moving to next question...'}
         </div>
       )}
 
       {result === 'completed' && (
         <div className="mcq-result grand-success">
           <h3>Category Complete!</h3>
-          <p>Congratulations! You've completed all {totalLevels} levels in {category}.</p>
+          <p>Congratulations! You've completed all {totalLevels} questions in {category}.</p>
         </div>
       )}
 

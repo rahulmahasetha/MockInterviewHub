@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useUserProgress } from "../context/UserProgressContext";
 
 export default function Dashboard() {
-  const { progress, globalLeaderboard, fetchGlobalLeaderboard, getTotalScore, logoutUser } = useUserProgress();
+  const { progress, globalLeaderboard, fetchGlobalLeaderboard, getTotalScore, logoutUser, requireAuth, openAuthModal } = useUserProgress();
   const navigate = useNavigate();
   const [isCoursesOpen, setIsCoursesOpen] = useState(true);
 
@@ -40,7 +40,7 @@ export default function Dashboard() {
     <div className="dash-layout">
       {/* Sidebar */}
       <aside className="dash-sidebar">
-        <div className="dash-logo">
+        <div className="dash-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
           <span className="dash-logo-icon">🎓</span>
           MockInterviewHub
         </div>
@@ -64,34 +64,57 @@ export default function Dashboard() {
             
             {isCoursesOpen && (
               <div className="dash-nav-submenu">
-                <div className="dash-nav-subitem">Programming</div>
-                <div className="dash-nav-subitem">Frontend</div>
-                <div className="dash-nav-subitem">Backend</div>
-                <div className="dash-nav-subitem">Data Structures</div>
-                <div className="dash-nav-subitem">System Design</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=prog')}>Programming</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=fe')}>Frontend</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=be')}>Backend</div>
+                <div className="dash-nav-subitem" onClick={() => navigate('/?tab=all')}>All Categories</div>
               </div>
             )}
           </div>
           
-          <Link to="/resume-interview" className="dash-nav-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div 
+            className="dash-nav-item" 
+            onClick={() => {
+              requireAuth('/resume-interview', () => navigate('/resume-interview'), {
+                title: 'Sign in to Start Resume-Based Interview',
+                subtitle: 'Sign in or create an account to start your resume interview.'
+              });
+            }}
+            style={{ cursor: 'pointer' }}
+          >
             <span className="dash-nav-icon">🤖</span> Resume AI Interview
-          </Link>
-          <Link to="/interview" className="dash-nav-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+          </div>
+          <div 
+            className="dash-nav-item" 
+            onClick={() => {
+              requireAuth('/interview', () => navigate('/interview'), {
+                title: 'Sign in to Start Technical Interview',
+                subtitle: 'Sign in or create an account to start your technical mock interview.'
+              });
+            }}
+            style={{ cursor: 'pointer' }}
+          >
             <span className="dash-nav-icon">🎯</span> Technical Mock Interview
-          </Link>
+          </div>
           <Link to="/leaderboard" className="dash-nav-item" style={{ textDecoration: 'none', color: 'inherit' }}>
             <span className="dash-nav-icon">🏆</span> Leaderboard
           </Link>
-          <div className="dash-nav-item" onClick={() => { logoutUser(); navigate('/'); }} style={{ cursor: 'pointer' }}>
-            <span className="dash-nav-icon">↪️</span> Logout
-          </div>
+          {progress.username ? (
+            <div className="dash-nav-item" onClick={() => { logoutUser(); navigate('/'); }} style={{ cursor: 'pointer' }}>
+              <span className="dash-nav-icon">↪️</span> Logout
+            </div>
+          ) : (
+            <div className="dash-nav-item" onClick={() => openAuthModal()} style={{ cursor: 'pointer', color: '#4f46e5', fontWeight: 700 }}>
+              <span className="dash-nav-icon">🔑</span> Sign In
+            </div>
+          )}
         </nav>
 
         <div className="dash-subject-areas">
           <div className="dash-subject-title">SUBJECT AREAS</div>
-          <div className="dash-nav-item"><span className="dash-nav-icon">✏️</span> Programming</div>
-          <div className="dash-nav-item"><span className="dash-nav-icon">🖥️</span> Frontend</div>
-          <div className="dash-nav-item"><span className="dash-nav-icon">⚙️</span> Backend</div>
+          <div className="dash-nav-item" onClick={() => navigate('/?tab=prog')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">✏️</span> Programming</div>
+          <div className="dash-nav-item" onClick={() => navigate('/?tab=fe')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">🖥️</span> Frontend</div>
+          <div className="dash-nav-item" onClick={() => navigate('/?tab=be')} style={{ cursor: 'pointer' }}><span className="dash-nav-icon">⚙️</span> Backend</div>
         </div>
       </aside>
 
@@ -100,11 +123,19 @@ export default function Dashboard() {
         {/* Header */}
         <header className="dash-header">
           <div>
-            <h1 className="dash-welcome">Welcome back, {progress.username || 'Rahul'}! 👋</h1>
+            <h1 className="dash-welcome">Welcome{progress.username ? ` back, ${progress.username}` : ' to MockInterviewHub'}! 👋</h1>
             <p className="dash-subtitle">Ready for your next interview?</p>
           </div>
-          <button className="dash-btn-start" onClick={() => navigate('/interview')}>
-            Start Interview
+          <button
+            className="dash-btn-start"
+            onClick={() => {
+              requireAuth('/interview', () => navigate('/interview'), {
+                title: 'Sign in to Start Technical Interview',
+                subtitle: 'Sign in or create an account to start your technical mock interview.'
+              });
+            }}
+          >
+            Start Technical Interview
           </button>
         </header>
 

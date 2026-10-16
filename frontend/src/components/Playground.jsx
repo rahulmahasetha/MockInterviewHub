@@ -25,7 +25,7 @@ export default function Playground() {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const [selectedLevel, setSelectedLevel] = useState(null);
-  const { getCategoryProgress } = useUserProgress();
+  const { getCategoryProgress, progress, requireAuth } = useUserProgress();
   const [data, setData] = useState({ levels: [] });
   const [categoryData, setCategoryData] = useState(null);
   const [isLoadingCategory, setIsLoadingCategory] = useState(true);
@@ -64,8 +64,30 @@ export default function Playground() {
   };
 
   function onLevelClick(level) {
+    if (!progress?.username) {
+      requireAuth(`/playground/${category}`, () => setSelectedLevel(level), {
+        title: 'Sign in to Start Quiz',
+        subtitle: `Sign in or create an account to start the ${categoryTitle} quiz.`
+      });
+      return;
+    }
     setSelectedLevel(level);
   }
+
+  const handleStartQuiz = () => {
+    if (!progress?.username) {
+      requireAuth(`/playground/${category}`, () => {
+        if (data.levels.length > 0) setSelectedLevel(data.levels[0]);
+      }, {
+        title: 'Sign in to Start Quiz',
+        subtitle: `Sign in or create an account to start the ${categoryTitle} quiz.`
+      });
+      return;
+    }
+    if (data.levels.length > 0) {
+      setSelectedLevel(data.levels[0]);
+    }
+  };
 
   const requestFullscreen = async () => {
     try {
@@ -90,7 +112,21 @@ export default function Playground() {
   // map positions removed
 
   if (!passedPreCheck) {
-    return <PreInterviewCheck onComplete={() => setPassedPreCheck(true)} />;
+    return (
+      <PreInterviewCheck
+        title={`${categoryTitle} Quiz - Proctoring & Instructions`}
+        onComplete={() => {
+          if (!progress?.username) {
+            requireAuth(`/playground/${category}`, () => setPassedPreCheck(true), {
+              title: 'Sign in to Start Quiz',
+              subtitle: `Sign in or create an account to start the ${categoryTitle} quiz.`
+            });
+            return;
+          }
+          setPassedPreCheck(true);
+        }}
+      />
+    );
   }
 
   return (
@@ -131,12 +167,12 @@ export default function Playground() {
             <div className="progress-content">
               <div className="progress-header-box">
                 <span className="count">{passedCount}/{totalLevels}</span>
-                <span className="label">Levels Completed</span>
+                <span className="label">Questions Completed</span>
               </div>
 
               <div className="progress-details-modal">
                 <div className="progress-item-modal">
-                  <span className="progress-label">Levels Completed</span>
+                  <span className="progress-label">Questions Completed</span>
                   <span className="progress-value">{passedCount}</span>
                 </div>
                 <div className="progress-item-modal">
@@ -144,7 +180,7 @@ export default function Playground() {
                   <span className="progress-value">{currentScore} pts</span>
                 </div>
                 <div className="progress-item-modal">
-                  <span className="progress-label">Levels Remaining</span>
+                  <span className="progress-label">Questions Remaining</span>
                   <span className="progress-value">{totalLevels - passedCount}</span>
                 </div>
               </div>
@@ -166,7 +202,7 @@ export default function Playground() {
               </div>
 
               <div className="level-breakdown">
-                <h4>Level Progress</h4>
+                <h4>Questions Overview</h4>
                 <div className="levels-grid">
                   {data.levels.map((_, index) => {
                     const levelNumber = index + 1;
@@ -175,12 +211,12 @@ export default function Playground() {
 
                     return (
                       <div key={index} className="level-status">
-                        <div className={`level-indicator ${isCompleted ? 'completed' : isCurrent ? 'current' : 'locked'}`}>
+                        <div className={`level-indicator ${isCompleted ? 'completed' : isCurrent ? 'current' : 'ready'}`}>
                           {isCompleted ? 'OK' : isCurrent ? 'Now' : levelNumber}
                         </div>
-                        <span className="level-text">Level {levelNumber}</span>
+                        <span className="level-text">Question {levelNumber}</span>
                         <span className="level-state">
-                          {isCompleted ? 'Completed' : isCurrent ? 'Current' : 'Locked'}
+                          {isCompleted ? 'Completed' : isCurrent ? 'Current' : 'Ready'}
                         </span>
                       </div>
                     );
@@ -219,7 +255,7 @@ export default function Playground() {
                   {!isLoadingCategory && (
                     <>
                       {!selectedLevel && data.levels.length > 0 && (
-                        <button className="start-quiz-btn" onClick={() => setSelectedLevel(data.levels[0])}>Start Quiz</button>
+                        <button className="start-quiz-btn" onClick={handleStartQuiz}>Start Quiz</button>
                       )}
 
                       {selectedLevel && (
@@ -261,15 +297,12 @@ export default function Playground() {
                   const levelNumber = idx + 1;
                   const isCompleted = passed.has(levelNumber - 1);
                   const isCurrent = selectedLevel?.level === levelNumber;
-                  const previousLevelCompleted = levelNumber === 1 || passed.has(levelNumber - 2);
-                  const isLocked = !previousLevelCompleted && !isCompleted;
 
                   return (
                     <button
                       key={idx}
-                      className={`nav-cell ${isCompleted ? 'answered' : isCurrent ? 'current' : isLocked ? 'locked' : 'unanswered'}`}
-                      onClick={() => !isLocked && setSelectedLevel(data.levels[idx])}
-                      disabled={isLocked}
+                      className={`nav-cell ${isCompleted ? 'answered' : isCurrent ? 'current' : 'unanswered'}`}
+                      onClick={() => setSelectedLevel(data.levels[idx])}
                     >
                       {levelNumber}
                     </button>

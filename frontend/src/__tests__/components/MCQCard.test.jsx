@@ -69,9 +69,9 @@ describe('MCQCard', () => {
       expect(screen.getByText(/What is 2 \+ 2\?/)).toBeInTheDocument();
     });
 
-    test('renders the level number in the heading', () => {
+    test('renders the question number in the heading', () => {
       renderCard();
-      expect(screen.getByText(/Level 1:/)).toBeInTheDocument();
+      expect(screen.getByText(/Question 1:/)).toBeInTheDocument();
     });
 
     test('renders all four answer options', () => {
