@@ -11,11 +11,13 @@ import ResumeAI from './components/ResumeAI';
 import AdminPanel from './components/AdminPanel';
 import ResumeBuilder from './components/ResumeBuilder';
 import Dashboard from './components/Dashboard';
+import AuthModal from './components/AuthModal';
 import { UserProgressProvider } from './context/UserProgressContext';
 
 export default function App() {
   return (
     <UserProgressProvider>
+      <AuthModal />
       <ToastContainer
         position="top-right"
         autoClose={3000}

@@ -1,13 +1,16 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { COIN_REWARDS, useUserProgress } from "../context/UserProgressContext";
 import { quizAPI, usersAPI } from "../services/api";
 import { toast } from "react-toastify";
+import ProfileSection from "./ProfileSection";
+import Footer from "./Footer";
 
 export default function Home() {
   const {
     progress,
     resetProgress,
+    resetCoins,
     signInUser,
     signUpUser,
     logoutUser,
@@ -17,17 +20,15 @@ export default function Home() {
     globalLeaderboard,
     fetchGlobalLeaderboard,
     updateUserProfile,
-    claimDailyLoginReward
+    claimDailyLoginReward,
+    requireAuth,
+    openAuthModal
   } = useUserProgress();
 
   const navigate = useNavigate();
+  const location = useLocation();
   const fileInputRef = useRef(null);
   const [categories, setCategories] = useState([]);
-  const [activeTab, setActiveTab] = useState("signin");
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [programmingExpanded, setProgrammingExpanded] = useState(true);
@@ -37,6 +38,11 @@ export default function Home() {
   const [activeNav, setActiveNav] = useState("dashboard"); // Default to Dashboard View
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [rewardsHelpOpen, setRewardsHelpOpen] = useState(false);
+  const notificationsRef = useRef(null);
+  const rewardsHelpRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   // Sidebar Accordion State
   const [sbProgExpanded, setSbProgExpanded] = useState(false);
@@ -203,6 +209,34 @@ export default function Home() {
     return () => { document.body.style.overflow = ""; };
   }, [sidebarOpen, isSettingsModalOpen]);
 
+  // Close header popovers when clicking outside or pressing Escape
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(e.target)) {
+        setNotificationsOpen(false);
+      }
+      if (rewardsHelpRef.current && !rewardsHelpRef.current.contains(e.target)) {
+        setRewardsHelpOpen(false);
+      }
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setNotificationsOpen(false);
+        setRewardsHelpOpen(false);
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   useEffect(() => {
     async function loadCategories() {
       try {
@@ -214,6 +248,35 @@ export default function Home() {
     }
     loadCategories();
     fetchGlobalLeaderboard();
+  }, []);
+
+  // Listen to ?tab=... query param and auto-switch tabs
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab === 'profile') {
+      if (progress?.username) {
+        setActiveNav('profile');
+      } else {
+        requireAuth('profile', () => setActiveNav('profile'), {
+          title: 'Sign in to View Profile',
+          subtitle: 'Sign in or create an account to view your career readiness and interview history.'
+        });
+      }
+    } else if (tab === 'all') {
+      setActiveNav('all');
+    } else if (tab === 'dashboard') {
+      setActiveNav('dashboard');
+    }
+  }, [location.search, progress?.username]);
+
+  // Listen to custom event from AuthModal or other components
+  useEffect(() => {
+    const handleSwitchToProfile = () => {
+      setActiveNav('profile');
+    };
+    window.addEventListener('switch-to-profile-tab', handleSwitchToProfile);
+    return () => window.removeEventListener('switch-to-profile-tab', handleSwitchToProfile);
   }, []);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -249,130 +312,12 @@ export default function Home() {
   const LEVEL = Math.floor(XP / 200) + 1;
   const coinBalance = progress.coins || 0;
   const coinHistory = progress.coinHistory || [];
-  const nextRewardGoal = 1000;
-  const nextRewardProgress = Math.min(100, Math.round((coinBalance / nextRewardGoal) * 100));
   const sortedLeaderboard = [...(globalLeaderboard || [])].sort((a, b) => (b.score || 0) - (a.score || 0));
-  const leaderboardRank = Math.max(1, sortedLeaderboard.findIndex(entry => entry.name === progress.username) + 1 || 8);
-  const rewardRows = Object.values(COIN_REWARDS);
-  const dailyChallenges = [
-    { title: 'Complete Daily Challenge', coins: COIN_REWARDS.DAILY_CHALLENGE.coins, progress: 65 },
-    { title: 'Solve Coding Challenge', coins: COIN_REWARDS.CODING_CHALLENGE.coins, progress: 35 },
-    { title: 'Maintain 95% Accuracy', coins: COIN_REWARDS.ACCURACY_STREAK.coins, progress: 80 }
-  ];
-  const achievements = [
-    { title: 'Perfect First Try', meta: '+50 coins', unlocked: coinHistory.some(h => h.source === 'FIRST_ATTEMPT_PERFECT') },
-    { title: 'Interview Pro', meta: '+100 coins', unlocked: coinHistory.some(h => h.source === 'AI_MOCK_INTERVIEW') },
-    { title: 'Clean Session', meta: '+30 coins', unlocked: coinHistory.some(h => h.source === 'NO_PROCTORING_VIOLATIONS') },
-    { title: 'Topic Master', meta: '+150 coins', unlocked: coinHistory.some(h => h.source === 'COMPLETE_TOPIC') }
-  ];
-  const redeemRewards = [
-    { title: 'Premium Hint Pack', cost: 250 },
-    { title: 'AI Feedback Boost', cost: 500 },
-    { title: 'Profile Badge', cost: 750 }
-  ];
+  const leaderboardRank = progress?.username ? (sortedLeaderboard.findIndex(entry => entry.name === progress.username) + 1 || '-') : '-';
 
   const handleReset = () => {
     if (window.confirm("Reset all progress?")) resetProgress();
   };
-
-  const handleAuthSubmit = async e => {
-    e.preventDefault();
-    const u = username.trim();
-    const em = email.trim();
-    const pw = password.trim();
-    setIsSubmitting(true);
-    if (activeTab === "signin") {
-      if (!u || !pw) { setIsSubmitting(false); return alert("Fill all fields."); }
-      await signInUser(u, pw);
-    } else if (activeTab === "signup") {
-      if (!u || !em || !pw) { setIsSubmitting(false); return alert("Fill all fields."); }
-      await signUpUser(u, em, pw);
-    } else {
-      if (!u || !em || !pw) { setIsSubmitting(false); return alert("Fill all fields."); }
-      await forgotPasswordUser(u, em, pw);
-    }
-    setIsSubmitting(false);
-  };
-
-  /* ── AUTH SCREEN ── */
-  if (!progress.username) {
-    return (
-      <div className="hd-auth-bg">
-        <div className="hd-auth-card">
-          <div className="hd-auth-logo">
-            <span className="hd-logo-icon">🎓</span>
-            <span className="hd-logo-text">EduQuest</span>
-          </div>
-          <h2 className="hd-auth-heading">
-            {activeTab === 'forgot' ? 'Reset Password' : activeTab === 'signup' ? 'Create Account' : 'Welcome Back'}
-          </h2>
-          <p className="hd-auth-sub">
-            {activeTab === 'signin'
-              ? 'Sign in to continue your learning journey'
-              : activeTab === 'signup'
-              ? 'Join thousands of learners today'
-              : 'Enter your details to reset your password'}
-          </p>
-          {activeTab !== 'forgot' && (
-            <div className="hd-auth-tabs">
-              <button className={`hd-atab ${activeTab === 'signin' ? 'active' : ''}`}
-                onClick={() => { setActiveTab('signin'); setUsername(''); setEmail(''); setPassword(''); }}>
-                Sign In
-              </button>
-              <button className={`hd-atab ${activeTab === 'signup' ? 'active' : ''}`}
-                onClick={() => { setActiveTab('signup'); setUsername(''); setEmail(''); setPassword(''); }}>
-                Sign Up
-              </button>
-            </div>
-          )}
-          <form onSubmit={handleAuthSubmit} className="hd-auth-form">
-            <div className="hd-fgroup">
-              <label>Username</label>
-              <input type="text" placeholder="Enter username" value={username}
-                onChange={e => setUsername(e.target.value)} disabled={isSubmitting} required />
-            </div>
-            {(activeTab === 'signup' || activeTab === 'forgot') && (
-              <div className="hd-fgroup">
-                <label>Email</label>
-                <input type="email" placeholder="Enter email" value={email}
-                  onChange={e => setEmail(e.target.value)} disabled={isSubmitting} required />
-              </div>
-            )}
-            <div className="hd-fgroup">
-              <div className="hd-flabel-row">
-                <label>{activeTab === 'forgot' ? 'New Password' : 'Password'}</label>
-                {activeTab === 'signin' && (
-                  <button type="button" className="hd-forgot-link"
-                    onClick={() => { setActiveTab('forgot'); setUsername(''); setEmail(''); setPassword(''); }}>
-                    Forgot?
-                  </button>
-                )}
-              </div>
-              <div className="hd-pw-wrap">
-                <input type={showPassword ? "text" : "password"} placeholder="Enter password"
-                  value={password} onChange={e => setPassword(e.target.value)} disabled={isSubmitting} required />
-                <button type="button" className="hd-pw-toggle" onClick={() => setShowPassword(!showPassword)}>
-                  {showPassword ? '🙈' : '👁'}
-                </button>
-              </div>
-            </div>
-            <button type="submit" className="hd-auth-btn" disabled={isSubmitting}>
-              {isSubmitting ? 'Please wait…'
-                : activeTab === 'signin' ? 'Sign In'
-                : activeTab === 'signup' ? 'Create Account'
-                : 'Update Password'}
-            </button>
-            {activeTab === 'forgot' && (
-              <button type="button" className="hd-back-link"
-                onClick={() => { setActiveTab('signin'); setUsername(''); setEmail(''); setPassword(''); }}>
-                ← Back to Sign In
-              </button>
-            )}
-          </form>
-        </div>
-      </div>
-    );
-  }
 
   /* ── CATEGORY CARD ── */
   const CategoryCard = ({ category }) => {
@@ -381,14 +326,32 @@ export default function Home() {
     const total = category.levels?.length || 0;
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     const isComplete = done === total && total > 0;
+
+    const handleStartQuiz = (e) => {
+      e.preventDefault();
+      requireAuth(`/playground/${category.slug}`, () => {
+        navigate(`/playground/${category.slug}`);
+      }, {
+        title: 'Sign in to Start Quiz',
+        subtitle: `Sign in or create an account to start the ${category.name} challenge.`
+      });
+    };
+
     return (
-      <Link to={`/playground/${category.slug}`} className="hd-subcard card-large-premium">
+      <div
+        onClick={handleStartQuiz}
+        className="hd-subcard card-large-premium"
+        style={{ cursor: 'pointer' }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleStartQuiz(e); }}
+      >
         <div className="card-header-premium">
           <div className="card-icon-premium" style={{ background: `${category.color}15`, border: `1px solid ${category.iconColor}30` }}>
             <span style={{ color: category.iconColor, fontWeight: 800, fontSize: '0.85rem' }}>{category.label}</span>
           </div>
           <div className="card-badge-premium" style={{ background: isComplete ? '#ecfdf5' : done > 0 ? '#eff6ff' : '#f1f5f9', color: isComplete ? '#049669' : done > 0 ? '#1d4ed8' : '#475569' }}>
-            {done} / {total} Levels
+            {done} / {total} Questions
           </div>
         </div>
 
@@ -406,10 +369,10 @@ export default function Home() {
           </div>
 
           <div className={`card-cta-premium ${isComplete ? 'complete' : done > 0 ? 'in-progress' : 'not-started'}`} style={{ '--brand-color': category.iconColor }}>
-            {isComplete ? 'Completed' : done > 0 ? 'Resume Play' : 'Start Practice'}
+            {isComplete ? 'Completed' : done > 0 ? 'Resume Play' : 'Start Quiz'}
           </div>
         </div>
-      </Link>
+      </div>
     );
   };
 
@@ -450,14 +413,55 @@ export default function Home() {
           className={`hd-nav-item ${activeNav === 'dashboard' ? 'active' : ''}`}
           onClick={() => { setActiveNav('dashboard'); closeSidebar(); }}
         >⌂ Dashboard</button>
+        
         <button
           className={`hd-nav-item ${activeNav === 'all' ? 'active' : ''}`}
           onClick={() => { setActiveNav('all'); closeSidebar(); }}
         >🗂 All Categories</button>
-        
-        <Link to="/resume-interview" className="hd-nav-item" onClick={closeSidebar} style={{ color: '#2563eb', fontWeight: 600 }}>
-          📄 Resume AI Interview
-        </Link>
+
+        <button
+          className={`hd-nav-item ${activeNav === 'profile' ? 'active' : ''}`}
+          onClick={() => {
+            closeSidebar();
+            requireAuth('profile', () => setActiveNav('profile'), {
+              title: 'Sign in to View Profile',
+              subtitle: 'Sign in or create an account to view your career readiness and interview history.'
+            });
+          }}
+          style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+        >
+          👤 My Profile
+        </button>
+
+        <button
+          type="button"
+          className="hd-nav-item"
+          onClick={() => {
+            closeSidebar();
+            requireAuth('/interview', () => navigate('/interview'), {
+              title: 'Sign in to Start Technical Interview',
+              subtitle: 'Sign in or create an account to launch your AI-proctored technical interview.'
+            });
+          }}
+          style={{ color: '#059669', fontWeight: 600, background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+        >
+          🤖 Start Technical Interview
+        </button>
+
+        <button
+          type="button"
+          className="hd-nav-item"
+          onClick={() => {
+            closeSidebar();
+            requireAuth('/resume-interview', () => navigate('/resume-interview'), {
+              title: 'Sign in to Start Resume-Based Interview',
+              subtitle: 'Sign in or create an account to start your resume interview.'
+            });
+          }}
+          style={{ color: '#2563eb', fontWeight: 600, background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+        >
+          📄 Start Resume-Based Interview
+        </button>
         
         <div className="hd-nav-label">Subject Areas</div>
         
@@ -477,10 +481,22 @@ export default function Home() {
           <div className={`hd-accordion-body ${sbProgExpanded ? 'open' : ''}`}>
             <div className="hd-accordion-inner">
               {programmingCategories.map(c => (
-                <Link key={c.slug} to={`/playground/${c.slug}`} className="hd-acc-item" onClick={closeSidebar}>
+                <button
+                  key={c.slug}
+                  type="button"
+                  className="hd-acc-item"
+                  style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+                  onClick={() => {
+                    closeSidebar();
+                    requireAuth(`/playground/${c.slug}`, () => navigate(`/playground/${c.slug}`), {
+                      title: 'Sign in to Start Quiz',
+                      subtitle: `Sign in or create an account to start the ${c.name} challenge.`
+                    });
+                  }}
+                >
                   <span className="acc-dot" style={{ background: c.iconColor }}></span>
                   <span className="acc-text">{c.name.replace(' Programming Quiz', '').replace(' Quiz', '')}</span>
-                </Link>
+                </button>
               ))}
             </div>
           </div>
@@ -502,10 +518,22 @@ export default function Home() {
           <div className={`hd-accordion-body ${sbFeExpanded ? 'open' : ''}`}>
             <div className="hd-accordion-inner">
               {frontendCategories.map(c => (
-                <Link key={c.slug} to={`/playground/${c.slug}`} className="hd-acc-item" onClick={closeSidebar}>
+                <button
+                  key={c.slug}
+                  type="button"
+                  className="hd-acc-item"
+                  style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+                  onClick={() => {
+                    closeSidebar();
+                    requireAuth(`/playground/${c.slug}`, () => navigate(`/playground/${c.slug}`), {
+                      title: 'Sign in to Start Quiz',
+                      subtitle: `Sign in or create an account to start the ${c.name} challenge.`
+                    });
+                  }}
+                >
                   <span className="acc-dot" style={{ background: c.iconColor }}></span>
                   <span className="acc-text">{c.name.replace(' Programming Quiz', '').replace(' Quiz', '')}</span>
-                </Link>
+                </button>
               ))}
             </div>
           </div>
@@ -527,14 +555,46 @@ export default function Home() {
           <div className={`hd-accordion-body ${sbBeExpanded ? 'open' : ''}`}>
             <div className="hd-accordion-inner">
               {backendCategories.map(c => (
-                <Link key={c.slug} to={`/playground/${c.slug}`} className="hd-acc-item" onClick={closeSidebar}>
+                <button
+                  key={c.slug}
+                  type="button"
+                  className="hd-acc-item"
+                  style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+                  onClick={() => {
+                    closeSidebar();
+                    requireAuth(`/playground/${c.slug}`, () => navigate(`/playground/${c.slug}`), {
+                      title: 'Sign in to Start Quiz',
+                      subtitle: `Sign in or create an account to start the ${c.name} challenge.`
+                    });
+                  }}
+                >
                   <span className="acc-dot" style={{ background: c.iconColor }}></span>
                   <span className="acc-text">{c.name.replace(' Programming Quiz', '').replace(' Quiz', '')}</span>
-                </Link>
+                </button>
               ))}
             </div>
           </div>
         </div>
+
+        {!progress?.username && (
+          <div className="hd-sidebar-guest-card">
+            <div className="hd-guest-badge">Guest Mode</div>
+            <p>Sign in to save your coins, quiz scores, and interview streaks.</p>
+            <button
+              type="button"
+              className="hd-guest-signin-btn"
+              onClick={() => {
+                closeSidebar();
+                openAuthModal(null, {
+                  title: 'Welcome to MockInterviewHub',
+                  subtitle: 'Sign in or create an account to track your progress.'
+                });
+              }}
+            >
+              Sign In / Sign Up
+            </button>
+          </div>
+        )}
       </nav>
     </>
   );
@@ -567,34 +627,280 @@ export default function Home() {
         </div>
 
         <div className="hd-nav-right">
-          <Link to="/resume-interview" className="hd-icon-btn" title="AI Resume Interview">📄</Link>
-          <Link to="/interview" className="hd-icon-btn" title="Technical Mock Interview">🤖</Link>
+          <button
+            type="button"
+            className="hd-icon-btn"
+            title="Start Resume-Based Interview"
+            onClick={() => {
+              requireAuth('/resume-interview', () => navigate('/resume-interview'), {
+                title: 'Sign in to Start Resume-Based Interview',
+                subtitle: 'Sign in or create an account to start your resume interview.'
+              });
+            }}
+          >
+            📄
+          </button>
+          <button
+            type="button"
+            className="hd-icon-btn"
+            title="Start Technical Interview"
+            onClick={() => {
+              requireAuth('/interview', () => navigate('/interview'), {
+                title: 'Sign in to Start Technical Interview',
+                subtitle: 'Sign in or create an account to launch your AI-proctored technical interview.'
+              });
+            }}
+          >
+            🤖
+          </button>
           <Link to="/leaderboard" className="hd-icon-btn" title="Leaderboard">🏆</Link>
-          <button className="hd-icon-btn" title="Notifications">🔔</button>
-          
-          <div className="hd-profile-dropdown-wrap">
-            <button className="hd-avatar-btn" onClick={() => setDropdownOpen(!dropdownOpen)} style={{ padding: 0, overflow: 'hidden' }}>
-              {progress.profilePhoto ? (
-                <img src={progress.profilePhoto} alt={progress.username} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                progress.username?.[0]?.toUpperCase()
-              )}
+
+          {/* Rewards Help Icon Button & Popover */}
+          <div className="hd-popover-wrap" ref={rewardsHelpRef}>
+            <button
+              className={`hd-icon-btn ${rewardsHelpOpen ? 'active' : ''}`}
+              title="Rewards & Coin Rules Help"
+              onClick={() => {
+                setRewardsHelpOpen(prev => !prev);
+                setNotificationsOpen(false);
+                setDropdownOpen(false);
+              }}
+              aria-label="Rewards & Coin Rules Information"
+              aria-expanded={rewardsHelpOpen}
+            >
+              <span style={{ fontWeight: 800, fontSize: '1.05rem', lineHeight: 1 }}>?</span>
             </button>
-            
-            {dropdownOpen && (
-              <div className="hd-dropdown-menu">
-                <div className="hd-dropdown-header">
-                  <strong>{progress.username}</strong>
-                  <span>Level {LEVEL} • {XP} XP</span>
+
+            {rewardsHelpOpen && (
+              <div className="hd-popover-card hd-rewards-popover" role="dialog" aria-label="Coin Rules Help">
+                <div className="hd-popover-header">
+                  <div className="hd-popover-title-row">
+                    <span className="hd-popover-icon">🪙</span>
+                    <div>
+                      <h4>Coin Rewards & Rules</h4>
+                      <p>How to earn coins across MockInterviewHub</p>
+                    </div>
+                  </div>
+                  <button 
+                    className="hd-popover-close" 
+                    onClick={() => setRewardsHelpOpen(false)}
+                    aria-label="Close rules popover"
+                  >
+                    ✕
+                  </button>
                 </div>
-                <hr />
-                <button onClick={openProfileDetails}>👤 My Profile</button>
-                <button onClick={openProfileSettings}>⚙️ Settings</button>
-                <hr />
-                <button onClick={() => { logoutUser(); setDropdownOpen(false); }} className="logout-text">↪ Log Out</button>
+
+                <div className="hd-rules-list">
+                  <div className="hd-rule-item">
+                    <div className="hd-rule-icon">📅</div>
+                    <div className="hd-rule-content">
+                      <div className="hd-rule-title-row">
+                        <strong>Daily Login</strong>
+                        <span className="hd-rule-badge">+5 coins</span>
+                      </div>
+                      <p>Claim once every 24 hours to boost your balance and keep your streak alive.</p>
+                    </div>
+                  </div>
+
+                  <div className="hd-rule-item">
+                    <div className="hd-rule-icon">🎯</div>
+                    <div className="hd-rule-content">
+                      <div className="hd-rule-title-row">
+                        <strong>Correct Quiz Answer</strong>
+                        <span className="hd-rule-badge">+1 coin</span>
+                      </div>
+                      <p>Awarded for each correct answer submitted in trivia and category quiz questions.</p>
+                    </div>
+                  </div>
+
+                  <div className="hd-rule-item">
+                    <div className="hd-rule-icon">🔥</div>
+                    <div className="hd-rule-content">
+                      <div className="hd-rule-title-row">
+                        <strong>7-Day Login Streak</strong>
+                        <span className="hd-rule-badge">+25 bonus coins</span>
+                      </div>
+                      <p>Awarded at every 7-day milestone of continuous daily logins (Days 7, 14, 21, etc.).</p>
+                    </div>
+                  </div>
+
+                  <div className="hd-rule-item">
+                    <div className="hd-rule-icon">🤖</div>
+                    <div className="hd-rule-content">
+                      <div className="hd-rule-title-row">
+                        <strong>Technical Mock Interview</strong>
+                        <span className="hd-rule-badge">Score-based</span>
+                      </div>
+                      <p>
+                        Earn <code>Math.floor(scorePercentage / 10)</code> coins based on your evaluation.
+                        <span className="hd-rule-example">Example: 77% score awards +7 coins (85% → 8 coins, 100% → 10 coins).</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="hd-rule-item">
+                    <div className="hd-rule-icon">📄</div>
+                    <div className="hd-rule-content">
+                      <div className="hd-rule-title-row">
+                        <strong>Resume-Based Interview</strong>
+                        <span className="hd-rule-badge">Score-based</span>
+                      </div>
+                      <p>
+                        Earn <code>Math.floor(scorePercentage / 10)</code> coins from your overall resume interview.
+                        <span className="hd-rule-example">Example: 77% score awards +7 coins automatically added to your wallet.</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="hd-popover-footer">
+                  <span>Current Balance: <strong>{(progress.coins || 0).toLocaleString()} coins</strong></span>
+                </div>
               </div>
             )}
           </div>
+
+          {/* Notifications Icon Button & Popover */}
+          <div className="hd-popover-wrap" ref={notificationsRef}>
+            <button 
+              className={`hd-icon-btn hd-notification-btn ${notificationsOpen ? 'active' : ''}`}
+              title="Notifications"
+              onClick={() => {
+                setNotificationsOpen(prev => !prev);
+                setRewardsHelpOpen(false);
+                setDropdownOpen(false);
+              }}
+              aria-label="Notifications"
+              aria-expanded={notificationsOpen}
+            >
+              🔔
+              {coinHistory.length > 0 && (
+                <span className="hd-badge-dot" />
+              )}
+            </button>
+
+            {notificationsOpen && (
+              <div className="hd-popover-card hd-notifications-popover" role="dialog" aria-label="Notifications Panel">
+                <div className="hd-popover-header">
+                  <div className="hd-popover-title-row">
+                    <span className="hd-popover-icon">🔔</span>
+                    <div>
+                      <h4>Notifications</h4>
+                      <p>Coin reward transactions & milestones</p>
+                    </div>
+                  </div>
+                  <button 
+                    className="hd-popover-close" 
+                    onClick={() => setNotificationsOpen(false)}
+                    aria-label="Close notifications popover"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="hd-notifications-list">
+                  {coinHistory.length > 0 ? (
+                    coinHistory.map((item) => {
+                      let icon = "🪙";
+                      if (item.source === "DAILY_LOGIN") icon = "📅";
+                      else if (item.source === "SEVEN_DAY_STREAK") icon = "🔥";
+                      else if (item.source === "ANSWER_CORRECTLY") icon = "🎯";
+                      else if (item.source === "INTERVIEW_SCORE") {
+                        icon = item.activity?.toLowerCase().includes("resume") ? "📄" : "🤖";
+                      }
+
+                      return (
+                        <div className="hd-notif-item" key={item.id}>
+                          <div className="hd-notif-icon-circle">{icon}</div>
+                          <div className="hd-notif-details">
+                            <div className="hd-notif-top">
+                              <span className="hd-notif-activity" title={item.activity}>{item.activity}</span>
+                              <span className="hd-notif-amount">+{item.coins} coins</span>
+                            </div>
+                            <span className="hd-notif-date">{item.date}</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="hd-notif-empty">
+                      <div className="hd-empty-bell">🔔</div>
+                      <h5>No notifications yet</h5>
+                      <p>Complete daily logins, quizzes, and interviews to earn coins and track rewards here!</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="hd-popover-footer">
+                  <span>Balance: <strong>{(progress.coins || 0).toLocaleString()} coins</strong></span>
+                  {coinHistory.length > 0 && (
+                    <small>{coinHistory.length} transaction{coinHistory.length > 1 ? 's' : ''}</small>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {progress?.username ? (
+            <div className="hd-profile-dropdown-wrap" ref={dropdownRef}>
+              <button 
+                className="hd-avatar-btn" 
+                onClick={() => {
+                  setDropdownOpen(!dropdownOpen);
+                  setNotificationsOpen(false);
+                  setRewardsHelpOpen(false);
+                }} 
+                style={{ padding: 0, overflow: 'hidden' }}
+              >
+                {progress.profilePhoto ? (
+                  <img src={progress.profilePhoto} alt={progress.username} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  progress.username?.[0]?.toUpperCase()
+                )}
+              </button>
+              
+              {dropdownOpen && (
+                <div className="hd-dropdown-menu">
+                  <div className="hd-dropdown-header">
+                    <strong>{progress.username}</strong>
+                    <span>{XP} XP</span>
+                  </div>
+                  <hr />
+                  <button onClick={openProfileDetails}>👤 My Profile</button>
+                  <button onClick={openProfileSettings}>⚙️ Settings</button>
+                  <hr />
+                  <button onClick={() => { logoutUser(); setDropdownOpen(false); }} className="logout-text">↪ Log Out</button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="hd-guest-nav-actions">
+              <button
+                type="button"
+                className="hd-profile-nav-link"
+                onClick={() => {
+                  requireAuth('profile', () => setActiveNav('profile'), {
+                    title: 'Sign in to View Profile',
+                    subtitle: 'Sign in or create an account to view your career readiness and interview history.'
+                  });
+                }}
+              >
+                👤 Profile
+              </button>
+              <button
+                type="button"
+                className="hd-signin-nav-btn"
+                onClick={() => {
+                  openAuthModal(null, {
+                    title: 'Welcome to MockInterviewHub',
+                    subtitle: 'Sign in or create an account to track your progress.'
+                  });
+                }}
+              >
+                Sign In
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -611,10 +917,16 @@ export default function Home() {
             <section className="rewards-hero rewards-glass">
               <div className="rewards-hero-copy">
                 <span className="rewards-kicker">Coin & Rewards</span>
-                <h1>Welcome back, {progress.username}</h1>
-                <p>Earn coins from quizzes, interviews, streaks, challenges, and leaderboard wins.</p>
+                <h1>{progress?.username ? `Welcome back, ${progress.username}` : 'Master Technical & Resume Interviews'}</h1>
+                <p>
+                  {progress?.username
+                    ? 'Earn coins from daily logins, quizzes, 7-day streaks, and interview performance.'
+                    : 'Interactive coding quizzes, real-time AI proctored technical interviews, and ATS resume evaluations.'}
+                </p>
                 <div className="rewards-hero-actions">
-                  <button onClick={() => setActiveNav('all')} className="reward-primary-btn">Start Earning</button>
+                  <button onClick={() => setActiveNav('all')} className="reward-primary-btn">
+                    {progress?.username ? 'Start Earning' : 'Explore Practice Quizzes'}
+                  </button>
                   <button onClick={() => navigate('/leaderboard')} className="reward-secondary-btn">View Rank</button>
                 </div>
               </div>
@@ -624,7 +936,7 @@ export default function Home() {
                 </div>
                 <span className="coin-label">Coin Balance</span>
                 <strong>{coinBalance.toLocaleString()}</strong>
-                <small>Level {LEVEL} • {completedSections} quizzes passed</small>
+                <small>{progress?.username ? `${completedSections} quizzes passed` : 'Sign in to save your coins'}</small>
               </div>
             </section>
 
@@ -635,10 +947,20 @@ export default function Home() {
                     <span>Daily Login</span>
                     <h2>+{COIN_REWARDS.DAILY_LOGIN.coins} coins</h2>
                   </div>
-                  <div className="reward-medal">20</div>
+                  <div className="reward-medal">{COIN_REWARDS.DAILY_LOGIN.coins}</div>
                 </div>
                 <p>Claim once every day and keep your streak alive.</p>
-                <button onClick={claimDailyLoginReward} className="reward-primary-btn">Claim Daily Reward</button>
+                <button
+                  onClick={() => {
+                    requireAuth(null, () => claimDailyLoginReward(), {
+                      title: 'Sign in to Claim Daily Reward',
+                      subtitle: 'Sign in or create an account to start claiming daily coins and streaks.'
+                    });
+                  }}
+                  className="reward-primary-btn"
+                >
+                  Claim Daily Reward
+                </button>
               </div>
 
               <div className="reward-card streak-card">
@@ -652,7 +974,7 @@ export default function Home() {
                 <div className="streak-track">
                   <div style={{ width: `${Math.min(100, ((progress.streakDays || 1) / 7) * 100)}%` }}></div>
                 </div>
-                <p>7 days unlocks +100 coins. 30 days unlocks +500 coins.</p>
+                <p>7-day streak unlocks +{COIN_REWARDS.SEVEN_DAY_STREAK.coins} bonus coins.</p>
               </div>
 
               <div className="reward-card rank-card">
@@ -661,377 +983,60 @@ export default function Home() {
                 <p>{totalScore} score points across your learning quests.</p>
                 <button onClick={() => navigate('/leaderboard')} className="reward-secondary-btn">Open Leaderboard</button>
               </div>
-
-              <div className="reward-card wheel-card">
-                <div className="spin-wheel">
-                  <span>+20</span><span>+75</span><span>+5</span><span>+100</span>
-                </div>
-                <div>
-                  <span>Spin-the-Wheel Bonus</span>
-                  <h2>Daily bonus spin</h2>
-                  <p>Try for surprise coin boosts after a challenge.</p>
-                </div>
-              </div>
             </section>
 
-            <section className="reward-main-layout">
-              <div className="reward-panel daily-challenges">
-                <div className="reward-section-title">
-                  <div>
-                    <span>Today</span>
-                    <h2>Daily Challenges</h2>
-                  </div>
-                  <button onClick={() => setActiveNav('all')} className="reward-icon-btn">→</button>
-                </div>
-                {dailyChallenges.map(challenge => (
-                  <div className="challenge-row" key={challenge.title}>
-                    <div>
-                      <strong>{challenge.title}</strong>
-                      <span>+{challenge.coins} coins</span>
-                    </div>
-                    <div className="mini-progress"><div style={{ width: `${challenge.progress}%` }}></div></div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="reward-panel progress-reward">
-                <div className="reward-section-title">
-                  <div>
-                    <span>Next Reward</span>
-                    <h2>Gold Badge Pack</h2>
-                  </div>
-                  <strong>{nextRewardProgress}%</strong>
-                </div>
-                <div className="reward-progress-bar"><div style={{ width: `${nextRewardProgress}%` }}></div></div>
-                <p>{Math.max(0, nextRewardGoal - coinBalance).toLocaleString()} coins left to unlock your next reward.</p>
-              </div>
-
-              <div className="reward-panel achievements-panel">
-                <div className="reward-section-title">
-                  <div>
-                    <span>Milestones</span>
-                    <h2>Achievements</h2>
-                  </div>
-                </div>
-                <div className="achievement-grid">
-                  {achievements.map(item => (
-                    <div className={`achievement-tile ${item.unlocked ? 'unlocked' : ''}`} key={item.title}>
-                      <span>{item.unlocked ? '✓' : '•'}</span>
-                      <strong>{item.title}</strong>
-                      <small>{item.meta}</small>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="reward-panel redeem-panel">
-                <div className="reward-section-title">
-                  <div>
-                    <span>Store</span>
-                    <h2>Redeem Rewards</h2>
-                  </div>
-                </div>
-                {redeemRewards.map(reward => (
-                  <div className="redeem-row" key={reward.title}>
-                    <div>
-                      <strong>{reward.title}</strong>
-                      <span>{reward.cost} coins</span>
-                    </div>
-                    <button disabled={coinBalance < reward.cost}>{coinBalance >= reward.cost ? 'Redeem' : 'Locked'}</button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="reward-panel reward-table-panel">
-                <div className="reward-section-title">
-                  <div>
-                    <span>Coin Rules</span>
-                    <h2>How Coins Are Earned</h2>
-                  </div>
-                </div>
-                <div className="coin-rules-table">
-                  {rewardRows.map(row => (
-                    <div className="coin-rule-row" key={row.label}>
-                      <span>{row.label}</span>
-                      <strong>+{row.coins}{row.suffix ? ` ${row.suffix}` : ''}</strong>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="reward-panel history-panel">
-                <div className="reward-section-title">
-                  <div>
-                    <span>Ledger</span>
-                    <h2>Recent Coin History</h2>
-                  </div>
-                </div>
-                {(coinHistory.length ? coinHistory.slice(0, 6) : [
-                  { id: 'empty-1', activity: 'Complete a quiz to start earning', coins: 0, date: 'No activity yet' }
-                ]).map(item => (
-                  <div className="history-row" key={item.id}>
-                    <div>
-                      <strong>{item.activity}</strong>
-                      <span>{item.date}</span>
-                    </div>
-                    <b>{item.coins > 0 ? `+${item.coins}` : '0'}</b>
-                  </div>
-                ))}
-              </div>
-            </section>
           </div>
          )}
 
         {activeNav === 'profile' && (
-          <div className="hd-profile-view">
-             {/* Hero Profile Section */}
-             <div className="profile-hero-card">
-               <div className="profile-hero-bg"></div>
-               <div className="profile-hero-content">
-                 {/* Left: Avatar */}
-                 <div className="profile-avatar-container" onClick={() => fileInputRef.current.click()} style={{ cursor: 'pointer' }}>
-                   {profilePhoto ? (
-                     <img src={profilePhoto} alt={progress.username} className="profile-avatar-img" />
-                   ) : (
-                     <div className="profile-avatar-large">{progress.username?.[0]?.toUpperCase()}</div>
-                   )}
-                   <div className="profile-avatar-overlay">
-                     <span>📸 Upload</span>
-                   </div>
-                   <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/*" style={{ display: 'none' }} />
-                   <div className="profile-level-badge">Lv {LEVEL}</div>
-                 </div>
-
-                 {/* Center: Full Name, @username & College Info */}
-                 <div className="profile-info-main">
-                   <h2>{progress.fullName || progress.username}</h2>
-                   <p className="profile-username">@{progress.username}</p>
-                   <p className="profile-title">
-                     {collegeName ? `${collegeName}` : "Explorer"} 
-                     {branch ? ` • ${branch}` : ""}
-                     {year ? ` • ${year}` : ""}
-                   </p>
-                 </div>
-
-                 {/* Right: Actions */}
-                 <div className="profile-hero-actions">
-                   <button className="btn-primary" onClick={openProfileSettings} title="Edit profile settings">
-                     <span>⚙️</span> Settings
-                   </button>
-                 </div>
-               </div>
-             </div>
-
-             {/* Professional Summary Cards — 4 columns, always visible above tabs */}
-             <div className="profile-stats-row">
-               <div className="stat-card">
-                 <div className="stat-icon stat-icon-blue">🏆</div>
-                 <div className="stat-info">
-                   <div className="stat-value">{totalScore}</div>
-                   <div className="stat-label">Total Score</div>
-                 </div>
-               </div>
-               <div className="stat-card">
-                 <div className="stat-icon stat-icon-green">✅</div>
-                 <div className="stat-info">
-                   <div className="stat-value">{completedSections}</div>
-                   <div className="stat-label">Quizzes Passed</div>
-                 </div>
-               </div>
-               <div className="stat-card">
-                 <div className="stat-icon stat-icon-purple">🌟</div>
-                 <div className="stat-info">
-                    <div className="stat-value">Level {LEVEL}</div>
-                    <div className="stat-label">Current Level</div>
-                 </div>
-               </div>
-               <div className="stat-card">
-                 <div className="stat-icon stat-icon-orange">🔥</div>
-                 <div className="stat-info">
-                    <div className="stat-value">{XP}</div>
-                    <div className="stat-label">Total XP</div>
-                 </div>
-               </div>
-             </div>
-             <div className="profile-tab-content">
-                 <div className="profile-grid-layout">
-                   {interviews.length === 0 ? (
-                     <>
-                       <div className="profile-left-col">
-                         <div className="profile-card profile-card-stable">
-                           <div className="card-header">
-                             <h3>Interview Performance</h3>
-                           </div>
-                           <div className="card-body interview-empty-state">
-                             <div className="interview-empty-icon">AI</div>
-                             <h3>No Mock Interviews Yet</h3>
-                             <p className="text-muted">Start a practice session to see your score, strengths, and improvement areas here.</p>
-                             <button className="btn-primary" onClick={() => navigate('/interview')}>
-                               Start Practice Session
-                             </button>
-                           </div>
-                         </div>
-                       </div>
-                       <div className="profile-right-col">
-                         <div className="profile-card profile-card-stable">
-                           <div className="card-header">
-                             <h3>Latest Session Analysis</h3>
-                           </div>
-                           <div className="card-body interview-placeholder-panel">
-                             <p className="text-muted">Your feedback summary and session history will appear after your first interview.</p>
-                           </div>
-                         </div>
-                       </div>
-                     </>
-                   ) : (
-                     (() => {
-                       const totalOverall = interviews.reduce((sum, i) => sum + i.overallScore, 0);
-                       const totalComm = interviews.reduce((sum, i) => sum + i.communicationScore, 0);
-                       const totalTech = interviews.reduce((sum, i) => sum + i.technicalScore, 0);
-                       const totalConf = interviews.reduce((sum, i) => sum + i.confidenceScore, 0);
-                       const count = interviews.length;
-
-                       const avgOverall = Math.round(totalOverall / count);
-                       const avgComm = Math.round(totalComm / count);
-                       const avgTech = Math.round(totalTech / count);
-                       const avgConf = Math.round(totalConf / count);
-
-                       const latestInterview = interviews[0];
-
-                       return (
-                         <>
-                           <div className="profile-left-col">
-                             <div className="profile-card profile-card-stable">
-                               <div className="card-header">
-                                 <h3>Interview Performance</h3>
-                                 <span className="card-header-badge">{count} sessions</span>
-                               </div>
-                               <div className="card-body">
-                                 <div className="iv-summary-score-card">
-                                   <div className="iv-score-ring-wrap">
-                                     <svg viewBox="0 0 36 36" className="circular-chart-lg">
-                                       <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                       <path className="circle-overall" strokeDasharray={`${avgOverall}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                     </svg>
-                                     <div className="iv-ring-center">
-                                       <span className="ring-score-val">{avgOverall}</span>
-                                       <span className="ring-score-lbl">Avg Score</span>
-                                     </div>
-                                   </div>
-                                   <div className="iv-summary-meta">
-                                     <h3>Performance Profile</h3>
-                                     <p className="text-muted">Based on recent mock interviews</p>
-                                     <button className="btn-primary-sm" onClick={() => navigate('/interview')}>
-                                       New Interview
-                                     </button>
-                                   </div>
-                                 </div>
-
-                                 <div className="iv-sub-bars">
-                                   <div className="iv-bar-row">
-                                     <div className="bar-row-lbl">
-                                       <span>Technical Skills</span>
-                                       <strong>{avgTech}%</strong>
-                                     </div>
-                                     <div className="progress-bar-container-sm">
-                                       <div className="progress-bar-fill-tech" style={{ width: `${avgTech}%` }} />
-                                     </div>
-                                   </div>
-                                   <div className="iv-bar-row">
-                                     <div className="bar-row-lbl">
-                                       <span>Communication</span>
-                                       <strong>{avgComm}%</strong>
-                                     </div>
-                                     <div className="progress-bar-container-sm">
-                                       <div className="progress-bar-fill-comm" style={{ width: `${avgComm}%` }} />
-                                     </div>
-                                   </div>
-                                   <div className="iv-bar-row">
-                                     <div className="bar-row-lbl">
-                                       <span>Confidence Level</span>
-                                       <strong>{avgConf}%</strong>
-                                     </div>
-                                     <div className="progress-bar-container-sm">
-                                       <div className="progress-bar-fill-conf" style={{ width: `${avgConf}%` }} />
-                                     </div>
-                                   </div>
-                                 </div>
-                               </div>
-                             </div>
-                           </div>
-
-                            <div className="profile-right-col">
-                              <div className="profile-card profile-card-stable">
-                                <div className="card-header">
-                                  <h3>Latest Session Analysis ({latestInterview.topic})</h3>
-                                 <span className="card-header-date">
-                                   {new Date(latestInterview.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                 </span>
-                               </div>
-                               <div className="card-body interview-card-scroll" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                                 <div className="iv-feedback-quote">
-                                   <p>"{latestInterview.feedbackSummary}"</p>
-                                 </div>
-
-                                 <div className="tags-container-grid">
-                                   <div className="tags-group">
-                                     <h4 className="strengths-title">Key Strengths</h4>
-                                     <div className="tags-list">
-                                       {latestInterview.strengths.map((s, idx) => (
-                                         <span key={idx} className="tag-badge strength-badge">{s}</span>
-                                       ))}
-                                     </div>
-                                   </div>
-                                   <div className="tags-group">
-                                     <h4 className="improvements-title">Areas for Improvement</h4>
-                                     <div className="tags-list">
-                                       {latestInterview.areasForImprovement.map((s, idx) => (
-                                         <span key={idx} className="tag-badge improvement-badge">{s}</span>
-                                       ))}
-                                     </div>
-                                   </div>
-                                 </div>
-
-                                 <div className="interview-history-compact">
-                                   <h4>Session History</h4>
-                                   <div className="table-responsive">
-                                     <table className="iv-history-table">
-                                       <thead>
-                                         <tr>
-                                           <th>Topic</th>
-                                           <th>Date</th>
-                                           <th>Score</th>
-                                         </tr>
-                                       </thead>
-                                       <tbody>
-                                         {interviews.map((iv, idx) => (
-                                           <tr key={idx}>
-                                             <td><strong>{iv.topic}</strong></td>
-                                             <td>{new Date(iv.date).toLocaleDateString()}</td>
-                                             <td>
-                                               <span className={`score-badge-cell ${iv.overallScore >= 80 ? 'good' : iv.overallScore >= 60 ? 'avg' : 'poor'}`}>
-                                                 {iv.overallScore}%
-                                               </span>
-                                             </td>
-                                           </tr>
-                                         ))}
-                                       </tbody>
-                                     </table>
-                                   </div>
-                                 </div>
-                               </div>
-                             </div>
-                           </div>
-                         </>
-                       );
-                     })()
-                   )}
-                 </div>
-               </div>
-              
-           </div>
-         )}
-        {/* Category groups for activeNav === 'all' / 'prog' / 'fe' / 'be' */}
+          progress?.username ? (
+            <ProfileSection
+              progress={progress}
+              LEVEL={LEVEL}
+              XP={XP}
+              totalScore={totalScore}
+              completedSections={completedSections}
+              categories={categories}
+              getCategoryProgress={getCategoryProgress}
+              fileInputRef={fileInputRef}
+              handlePhotoChange={handlePhotoChange}
+              profilePhoto={profilePhoto}
+              collegeName={collegeName}
+              branch={branch}
+              year={year}
+              openProfileSettings={openProfileSettings}
+              navigate={navigate}
+              setActiveNav={setActiveNav}
+              resetCoins={resetCoins}
+            />
+          ) : (
+            <div className="guest-profile-gate-card">
+              <div className="gate-icon">👤</div>
+              <h2>Authentication Required</h2>
+              <p>Sign in or create an account to view your career readiness score, performance history, and customized improvement plan.</p>
+              <div className="gate-actions">
+                <button
+                  type="button"
+                  className="reward-primary-btn"
+                  onClick={() => requireAuth('profile', () => setActiveNav('profile'), {
+                    title: 'Sign in to View Profile',
+                    subtitle: 'Sign in to view your career readiness and interview history.'
+                  })}
+                >
+                  Sign In to Continue
+                </button>
+                <button
+                  type="button"
+                  className="reward-secondary-btn"
+                  onClick={() => setActiveNav('dashboard')}
+                >
+                  Return to Dashboard
+                </button>
+              </div>
+            </div>
+          )
+        )}
+                {/* Category groups for activeNav === 'all' / 'prog' / 'fe' / 'be' */}
         {activeNav !== 'dashboard' && activeNav !== 'profile' && (
           <section className="hd-categories">
             {(activeNav === 'all' || activeNav === 'prog') && (
@@ -1080,6 +1085,8 @@ export default function Home() {
         )}
       </main>
       </div>
+
+      <Footer setActiveNav={setActiveNav} navigate={navigate} />
 
       {/* Settings Modal */}
       {isSettingsModalOpen && (
