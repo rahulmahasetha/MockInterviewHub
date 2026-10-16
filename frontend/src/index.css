@@ -4045,6 +4045,45 @@ input, textarea, select { font-family: inherit; }
 .hd-back-link:hover { text-decoration: underline; }
 
 /* ─────────────────────────────────────────────
+   GLOBAL TOAST NOTIFICATIONS (CRISP ELEVATION)
+───────────────────────────────────────────── */
+.Toastify__toast-container {
+  z-index: 999999 !important;
+  max-width: calc(100vw - 32px) !important;
+}
+
+.Toastify__toast {
+  border-radius: 12px !important;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.28) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  font-family: inherit !important;
+  font-size: 0.92rem !important;
+  padding: 14px 18px !important;
+}
+
+.Toastify__toast--error {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #fee2e2 !important;
+  border-left: 5px solid #ef4444 !important;
+}
+
+.Toastify__toast--success {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #dcfce7 !important;
+  border-left: 5px solid #16a34a !important;
+}
+
+.Toastify__toast--info {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #e0e7ff !important;
+  border-left: 5px solid #4f46e5 !important;
+}
+
+/* ─────────────────────────────────────────────
    GLOBAL AUTH MODAL (GUEST BROWSING)
 ───────────────────────────────────────────── */
 .hd-auth-modal-overlay {
@@ -4147,6 +4186,56 @@ input, textarea, select { font-family: inherit; }
 
 .browse-freely-btn:hover {
   color: #3730a3;
+}
+
+.hd-auth-error-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fef2f2;
+  border: 1.5px solid #fecaca;
+  color: #b91c1c;
+  padding: 12px 14px;
+  border-radius: 12px;
+  margin-bottom: 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.45;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.08);
+  animation: hdAuthFadeIn 0.2s ease forwards;
+}
+
+.hd-auth-error-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.hd-auth-error-text {
+  flex: 1;
+}
+
+@media (max-width: 480px) {
+  .hd-auth-modal-card {
+    padding: 24px 18px 20px;
+    border-radius: 18px;
+    max-width: 100%;
+  }
+
+  .hd-auth-heading {
+    font-size: 1.35rem;
+  }
+
+  .hd-auth-sub {
+    font-size: 0.84rem;
+    margin-bottom: 16px;
+  }
+
+  .hd-auth-btn {
+    padding: 13px;
+    font-size: 0.96rem;
+    min-height: 48px;
+  }
 }
 
 /* Guest Navigation & Header controls */
@@ -5348,8 +5437,110 @@ input, textarea, select { font-family: inherit; }
   .hd-hamburger-desktop { display: none; }
 }
 
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  button, a, input, select, textarea {
+    touch-action: manipulation;
+  }
+}
+
 @media (max-width: 600px) {
   .hd-nav-center { display: none; }
+
+  .hd-top-navbar {
+    padding: 0 12px;
+    height: 60px;
+  }
+
+  .hd-logo-text-nav {
+    font-size: 1.08rem;
+  }
+
+  .hd-nav-right {
+    gap: 6px;
+  }
+
+  .hd-icon-btn {
+    width: 35px;
+    height: 35px;
+    font-size: 1rem;
+  }
+
+  .hd-guest-nav-actions {
+    gap: 6px;
+  }
+
+  .hd-profile-nav-link {
+    padding: 6px 10px;
+    font-size: 0.82rem;
+  }
+
+  .hd-signin-nav-btn {
+    padding: 6px 13px;
+    font-size: 0.84rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .hd-top-navbar {
+    padding: 0 10px;
+    height: 56px;
+  }
+
+  .hd-logo-text-nav {
+    font-size: 0.98rem;
+  }
+
+  .hd-logo-icon {
+    font-size: 1.15rem;
+  }
+
+  .hd-icon-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 0.95rem;
+  }
+
+  .hd-profile-nav-link {
+    padding: 6px 8px;
+    font-size: 0.78rem;
+  }
+
+  .hd-signin-nav-btn {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    min-height: 36px;
+  }
+}
+
+@media (max-width: 390px) {
+  .hd-profile-nav-text {
+    display: none;
+  }
+
+  .hd-profile-nav-link {
+    padding: 6px 8px;
+    border-radius: 8px;
+  }
+
+  .hd-logo-text-nav {
+    font-size: 0.92rem;
+  }
+
+  .hd-nav-left {
+    gap: 8px;
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -6809,6 +7000,15 @@ input, textarea, select { font-family: inherit; }
   background: #334155;
   color: #ffffff;
   transform: translateY(-1px);
+}
+
+@media (max-width: 600px) {
+  .footer-bottom-bar {
+    padding: 16px 20px 24px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
 }
 
 
