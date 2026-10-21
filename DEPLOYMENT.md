@@ -1,45 +1,48 @@
-# 🚀 Production CI/CD & Deployment Guide
+# Production CI/CD & Deployment Guide
 
 This document describes the automated Continuous Integration (CI) and Continuous Deployment (CD) pipelines for **MockInterviewHub**, including GitHub Actions setup, secrets management, hosting configuration, health checks, and rollback procedures.
 
 ---
 
-## 📌 Architecture Overview
+## Architecture Overview
 
 ```text
                [ Push / Pull Request to main ]
-                              │
-             ┌────────────────┴────────────────┐
-             ▼                                 ▼
-   [ Backend CI Job ]                 [ Frontend CI Job ]
-    • Node.js 20 & npm ci              • Node.js 20 & npm ci
-    • Syntax & lint checks             • React component tests
-    • Jest unit & route tests          • Code coverage report
-    • Pytest integration tests         • Production bundle build
-    • Code coverage report             • Artifact verification
-             │                                 │
-             └────────────────┬────────────────┘
-                              ▼
-           [ Quality Gate: All Tests Passed? ]
-                     ├── NO  ──► ❌ Pipeline Fails (Deploy Blocked)
-                     └── YES ──► ✅ Proceed to CD (on push to main)
-                              │
-             ┌────────────────┴────────────────┐
-             ▼                                 ▼
-   [ Deploy Backend (Render) ]       [ Deploy Frontend (Vercel) ]
-    • Trigger deploy hook / API       • Deploy via Vercel Action / Hook
-    • Poll GET /health endpoint       • Verify HTTP 200 availability
-    • Rollback if probe fails         • Production live!
+                               |
+             +-----------------+-----------------+
+             |                                   |
+             v                                   v
+   [ Backend CI Job ]                  [ Frontend CI Job ]
+    * Node.js 20 & npm ci               * Node.js 20 & npm ci
+    * Syntax & lint checks              * React component tests
+    * Jest unit & route tests           * Code coverage report
+    * Pytest integration tests          * Production bundle build
+    * Code coverage report              * Artifact verification
+             |                                   |
+             +-----------------+-----------------+
+                               |
+                               v
+            [ Quality Gate: All Tests Passed? ]
+                      |-- NO  --> Block Deployment
+                      +-- YES --> Proceed to CD (on push to main)
+                               |
+             +-----------------+-----------------+
+             |                                   |
+             v                                   v
+   [ Deploy Backend (Render) ]         [ Deploy Frontend (Vercel) ]
+    * Trigger deploy hook / API         * Deploy via Vercel Action / Hook
+    * Poll GET /health endpoint         * Verify HTTP 200 availability
+    * Rollback if probe fails           * Production live
 ```
 
 ---
 
-## ⚙️ Workflows Created
+## Workflows Created
 
 1. **`.github/workflows/ci.yml`**
    - **Triggers:** Every `push` and `pull_request` targeting the `main` branch, plus manual `workflow_dispatch`.
-   - **Backend Job:** Clean dependency installation (`npm ci`), syntax linting, 100 Jest unit/route tests with coverage, background fallback server initialization, and Pytest black-box API tests.
-   - **Frontend Job:** Clean dependency installation (`npm ci`), 87 React testing library tests with coverage, optimized production build (`npm run build`), and artifact upload.
+   - **Backend Job:** Clean dependency installation (`npm ci`), syntax linting, 105 Jest unit/route tests with coverage, background fallback server initialization, and Pytest black-box API tests.
+   - **Frontend Job:** Clean dependency installation (`npm ci`), 97 React testing library tests with coverage, optimized production build (`npm run build`), and artifact upload.
    - **Test Isolation:** Backend tests run against in-memory fallback mocks without requiring live Gemini or Groq external API keys.
 
 2. **`.github/workflows/cd.yml`**
@@ -50,10 +53,10 @@ This document describes the automated Continuous Integration (CI) and Continuous
 
 ---
 
-## 🔐 Required Secrets & Environment Variables
+## Required Secrets & Environment Variables
 
 ### 1. GitHub Repository Secrets
-Navigate to **GitHub Repository ➔ Settings ➔ Secrets and variables ➔ Actions ➔ New repository secret**:
+Navigate to **GitHub Repository -> Settings -> Secrets and variables -> Actions -> New repository secret**:
 
 | Secret Name | Required For | Description | Example / How to Obtain |
 | :--- | :--- | :--- | :--- |
@@ -68,7 +71,7 @@ Navigate to **GitHub Repository ➔ Settings ➔ Secrets and variables ➔ Actio
 ---
 
 ### 2. Backend Hosting Environment Variables (Render / Railway / Server)
-Set these in your backend hosting platform dashboard (e.g. Render ➔ Environment):
+Set these in your backend hosting platform dashboard (e.g. Render -> Environment):
 
 | Environment Variable | Required | Description | Example |
 | :--- | :--- | :--- | :--- |
@@ -83,7 +86,7 @@ Set these in your backend hosting platform dashboard (e.g. Render ➔ Environmen
 ---
 
 ### 3. Frontend Hosting Environment Variables (Vercel)
-Set these in your Vercel project settings (**Project ➔ Settings ➔ Environment Variables**):
+Set these in your Vercel project settings (**Project -> Settings -> Environment Variables**):
 
 | Environment Variable | Description | Example |
 | :--- | :--- | :--- |
@@ -91,7 +94,7 @@ Set these in your Vercel project settings (**Project ➔ Settings ➔ Environmen
 
 ---
 
-## 🏥 Automated Health Checks
+## Automated Health Checks
 
 The backend provides a native health probe at `GET /health`:
 
@@ -115,7 +118,7 @@ curl -i https://<your-backend-domain>/health
 
 ---
 
-## 🔄 Deployment Verification & Rollback Playbook
+## Deployment Verification & Rollback Playbook
 
 ### Automated Verification
 When `cd.yml` runs:
@@ -126,13 +129,13 @@ When `cd.yml` runs:
 ### Rollback Playbook
 
 #### Rolling Back Backend (Render)
-1. Navigate to **Render Dashboard ➔ Web Services ➔ mockinterviewhub-backend ➔ Events**.
+1. Navigate to **Render Dashboard -> Web Services -> mockinterviewhub-backend -> Events**.
 2. Locate the last known healthy deployment commit.
 3. Click the three dots (`...`) next to that deploy and select **Rollback to this deploy**.
 4. Render immediately switches traffic back to the previous stable release.
 
 #### Rolling Back Frontend (Vercel)
-1. Navigate to **Vercel Dashboard ➔ mockinterviewhub ➔ Deployments**.
+1. Navigate to **Vercel Dashboard -> mockinterviewhub -> Deployments**.
 2. Locate the previous working production deployment.
 3. Click the three dots (`...`) and click **Instant Rollback**.
 4. Traffic is redirected to the previous build in under 5 seconds.
@@ -147,7 +150,7 @@ The CI/CD pipeline will automatically run tests against the reverted commit and 
 
 ---
 
-## 🧪 Local Testing & Verification Commands
+## Local Testing & Verification Commands
 
 Before opening a pull request, run all checks locally:
 
@@ -157,7 +160,7 @@ cd backend
 npm ci
 npm run test:coverage
 
-# 2. Pytest integration tests (runs in 0.02s)
+# 2. Pytest integration tests
 node server.js &
 PID=$!
 sleep 2
