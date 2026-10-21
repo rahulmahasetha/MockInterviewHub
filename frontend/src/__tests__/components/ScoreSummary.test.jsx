@@ -5,7 +5,7 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-// ── Mocks MUST be set up BEFORE importing the component ───────────────────────
+// 
 
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
@@ -32,19 +32,18 @@ jest.mock('../../services/api', () => ({
     getCategories: jest.fn(() =>
       Promise.resolve({
         data: [
-          { slug: 'math', name: 'Mathematics', label: '➕', iconColor: '#2563eb' },
-          { slug: 'science', name: 'Science', label: '🔬', iconColor: '#0f766e' },
+          { slug: 'math', name: 'Mathematics', label: 'MATH', iconColor: '#2563eb' },
+          { slug: 'science', name: 'Science', label: 'SCI', iconColor: '#0f766e' },
         ],
       })
     ),
   },
 }));
 
-// ── Component import AFTER mocks ──────────────────────────────────────────────
-
+// Component import after mocks
 import ScoreSummary from '../../components/ScoreSummary';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 
 
 describe('ScoreSummary', () => {
   beforeEach(() => {
@@ -53,7 +52,7 @@ describe('ScoreSummary', () => {
     mockGetTotalScore.mockReturnValue(75);
   });
 
-  // ── Basic rendering ─────────────────────────────────────────────────────────
+  // 
 
   describe('Initial render', () => {
     test('renders the "Final Score Summary" heading', async () => {
@@ -80,7 +79,7 @@ describe('ScoreSummary', () => {
     });
   });
 
-  // ── Categories loaded from API ──────────────────────────────────────────────
+  // 
 
   describe('After categories load', () => {
     test('calls quizAPI.getCategories on mount', async () => {
@@ -96,7 +95,7 @@ describe('ScoreSummary', () => {
     });
   });
 
-  // ── Navigation ──────────────────────────────────────────────────────────────
+  // 
 
   describe('Navigation', () => {
     test('renders the Back to Home button', async () => {
@@ -111,7 +110,7 @@ describe('ScoreSummary', () => {
     });
   });
 
-  // ── Side effects ────────────────────────────────────────────────────────────
+  // 
 
   describe('Side effects', () => {
     test('calls getTotalScore to compute the displayed total', async () => {
@@ -125,7 +124,7 @@ describe('ScoreSummary', () => {
     });
   });
 
-  // ── API error handling ──────────────────────────────────────────────────────
+  // 
 
   describe('API error handling', () => {
     test('renders without crashing when getCategories fails', async () => {

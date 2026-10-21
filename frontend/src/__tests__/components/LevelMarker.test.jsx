@@ -6,10 +6,10 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import LevelMarker from '../../components/LevelMarker';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 
 
 describe('LevelMarker', () => {
-  // ── Rendering ───────────────────────────────────────────────────────────────
+  // 
 
   describe('Rendering', () => {
     test('renders the level number when not locked or completed', () => {
@@ -28,7 +28,7 @@ describe('LevelMarker', () => {
     });
   });
 
-  // ── CSS class application ────────────────────────────────────────────────────
+  // 
 
   describe('CSS classes', () => {
     test('applies "locked" class when locked prop is true', () => {
@@ -65,7 +65,7 @@ describe('LevelMarker', () => {
     });
   });
 
-  // ── Disabled state ──────────────────────────────────────────────────────────
+  // 
 
   describe('Disabled state', () => {
     test('button is disabled when locked', () => {
@@ -79,7 +79,7 @@ describe('LevelMarker', () => {
     });
   });
 
-  // ── Tooltip ─────────────────────────────────────────────────────────────────
+  // 
 
   describe('Tooltip (title attribute)', () => {
     test('shows "Complete previous level to unlock" when locked', () => {
@@ -112,7 +112,7 @@ describe('LevelMarker', () => {
     });
   });
 
-  // ── Click behaviour ─────────────────────────────────────────────────────────
+  // 
 
   describe('Click behaviour', () => {
     test('calls onClick when not locked', () => {
@@ -132,7 +132,7 @@ describe('LevelMarker', () => {
     });
   });
 
-  // ── Category prop ────────────────────────────────────────────────────────────
+  // 
 
   describe('Category data attribute', () => {
     test('sets data-category attribute from category prop', () => {

@@ -34,7 +34,7 @@ import {
 
 const mockAxios = axios.__mockInstance;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 
 
 describe('authAPI', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -69,7 +69,7 @@ describe('authAPI', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 
 
 describe('userProgressAPI', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -96,7 +96,7 @@ describe('userProgressAPI', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 
 
 describe('leaderboardAPI', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -120,7 +120,7 @@ describe('leaderboardAPI', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 
 
 describe('quizAPI', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -152,7 +152,7 @@ describe('quizAPI', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 
 
 describe('interviewAPI', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -179,7 +179,7 @@ describe('interviewAPI', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 
 
 describe('resumeAPI', () => {
   beforeEach(() => jest.clearAllMocks());

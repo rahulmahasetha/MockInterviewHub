@@ -14,7 +14,7 @@ import {
   COIN_REWARDS,
 } from '../../context/UserProgressContext';
 
-// ── Mock dependencies ─────────────────────────────────────────────────────────
+// 
 
 jest.mock('react-toastify', () => ({
   toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() },
@@ -39,7 +39,7 @@ jest.mock('../../services/api', () => ({
   },
 }));
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 
 
 describe('COIN_REWARDS constant', () => {
   test('is an object', () => {
@@ -73,7 +73,7 @@ describe('COIN_REWARDS constant', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 
 
 describe('UserProgressProvider', () => {
   const originalLocalStorage = global.localStorage;

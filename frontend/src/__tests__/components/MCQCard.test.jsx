@@ -9,7 +9,7 @@ import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom';
 import MCQCard from '../../components/MCQCard';
 
-// ── Mock context ──────────────────────────────────────────────────────────────
+// 
 
 const mockMarkPassed = jest.fn();
 const mockIsLevelCompleted = jest.fn().mockReturnValue(false);
@@ -21,7 +21,7 @@ jest.mock('../../context/UserProgressContext', () => ({
   }),
 }));
 
-// ── Test data ─────────────────────────────────────────────────────────────────
+// 
 
 const sampleLevel = {
   level: 1,
@@ -32,7 +32,7 @@ const sampleLevel = {
   points: 10,
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// 
 
 const renderCard = (levelObj = sampleLevel, props = {}) => {
   const onCorrectNextLevel = jest.fn();
@@ -48,7 +48,7 @@ const renderCard = (levelObj = sampleLevel, props = {}) => {
   return { onCorrectNextLevel };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 
 
 describe('MCQCard', () => {
   beforeEach(() => {
@@ -61,7 +61,7 @@ describe('MCQCard', () => {
     jest.useRealTimers();
   });
 
-  // ── Rendering ───────────────────────────────────────────────────────────────
+  // 
 
   describe('Rendering', () => {
     test('renders the question text', () => {
@@ -111,7 +111,7 @@ describe('MCQCard', () => {
     });
   });
 
-  // ── Option selection ────────────────────────────────────────────────────────
+  // 
 
   describe('Option selection', () => {
     test('marks an option as selected when clicked', () => {
@@ -135,7 +135,7 @@ describe('MCQCard', () => {
     });
   });
 
-  // ── Hint toggle ─────────────────────────────────────────────────────────────
+  // 
 
   describe('Hint toggle', () => {
     test('shows hint text after clicking Show Hint', () => {
@@ -154,7 +154,7 @@ describe('MCQCard', () => {
     });
   });
 
-  // ── Answer submission ───────────────────────────────────────────────────────
+  // 
 
   describe('Answer submission', () => {
     test('shows correct result feedback when the right answer is selected', () => {
@@ -197,7 +197,7 @@ describe('MCQCard', () => {
     });
   });
 
-  // ── Timer ───────────────────────────────────────────────────────────────────
+  // 
 
   describe('Timer', () => {
     test('shows timer in the UI with correct initial value', () => {
