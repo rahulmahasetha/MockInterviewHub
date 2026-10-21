@@ -2,14 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─────────────────────────────────────────────
-   GOOGLE FONTS
-───────────────────────────────────────────── */
+/* GOOGLE FONTS */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
-/* ─────────────────────────────────────────────
-   DESIGN TOKENS
-───────────────────────────────────────────── */
+/* DESIGN TOKENS */
 :root {
   --brand:        #4f46e5;
   --brand-light:  #818cf8;
@@ -38,9 +34,7 @@
   --topbar-h:     56px;
 }
 
-/* ─────────────────────────────────────────────
-   RESET
-───────────────────────────────────────────── */
+/* RESET */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 16px; }
 body {
@@ -61,9 +55,7 @@ input, textarea, select { font-family: inherit; }
 ::-webkit-scrollbar-thumb        { background: #cbd5e1; border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover  { background: #94a3b8; }
 
-/* ─────────────────────────────────────────────
-   HOME – LAYOUT & TOP NAVBAR
-───────────────────────────────────────────── */
+/* HOME – LAYOUT & TOP NAVBAR */
 .hd-layout {
   display: flex;
   flex-direction: column;
@@ -148,9 +140,7 @@ input, textarea, select { font-family: inherit; }
 .hd-dropdown-menu button:hover { background: var(--bg); color: var(--brand); }
 .hd-dropdown-menu button.logout-text:hover { color: var(--danger); background: var(--danger-bg); }
 
-/* ─────────────────────────────────────────────
-   HEADER POPOVERS (REWARDS HELP & NOTIFICATIONS)
-───────────────────────────────────────────── */
+/* HEADER POPOVERS (REWARDS HELP & NOTIFICATIONS) */
 .hd-popover-wrap {
   position: relative;
 }
@@ -506,9 +496,7 @@ input, textarea, select { font-family: inherit; }
   position: relative;
 }
 
-/* ─────────────────────────────────────────────
-   MOBILE OVERLAY BACKDROP
-───────────────────────────────────────────── */
+/* MOBILE OVERLAY BACKDROP */
 .hd-overlay {
   position: fixed;
   inset: 0;
@@ -524,9 +512,7 @@ input, textarea, select { font-family: inherit; }
   to { opacity: 1; }
 }
 
-/* ─────────────────────────────────────────────
-   SIDEBAR – DESKTOP (always visible ≥769px)
-───────────────────────────────────────────── */
+/* SIDEBAR – DESKTOP (always visible ≥769px) */
 .hd-sidebar {
   background: var(--surface);
   border-right: 1px solid var(--border);
@@ -684,9 +670,7 @@ input, textarea, select { font-family: inherit; }
 }
 .hd-logout-btn:hover { background: var(--danger-bg); color: var(--danger); border-color: #fca5a5; }
 
-/* ─────────────────────────────────────────────
-   SIDEBAR ACCORDION
-───────────────────────────────────────────── */
+/* SIDEBAR ACCORDION */
 .hd-sb-accordion {
   display: flex;
   flex-direction: column;
@@ -758,9 +742,7 @@ input, textarea, select { font-family: inherit; }
   text-overflow: ellipsis;
 }
 
-/* ─────────────────────────────────────────────
-   MAIN CONTENT AREA
-───────────────────────────────────────────── */
+/* MAIN CONTENT AREA */
 .hd-main {
   display: flex;
   flex-direction: column;
@@ -769,9 +751,7 @@ input, textarea, select { font-family: inherit; }
   overflow-x: hidden;
 }
 
-/* ─────────────────────────────────────────────
-   CATEGORY SECTION
-───────────────────────────────────────────── */
+/* CATEGORY SECTION */
 .hd-categories {
   display: flex;
   flex-direction: column;
@@ -781,7 +761,7 @@ input, textarea, select { font-family: inherit; }
   max-width: 100%;
 }
 
-/* ── SUBJECT AREA PILL FILTER BAR ── */
+/*  */
 .hd-subject-filter-bar {
   display: flex;
   align-items: center;
@@ -865,7 +845,7 @@ input, textarea, select { font-family: inherit; }
   margin-top: 12px;
 }
 
-/* ── GROUP BLOCK ── */
+/*  */
 .hd-group {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -898,7 +878,7 @@ input, textarea, select { font-family: inherit; }
   border-top: 1px solid rgba(0,0,0,0.08);
 }
 
-/* ── SUBCARDS GRID – Responsive ── */
+/*  */
 /*
   1440px+  : 5 columns
   1024px   : 4 columns
@@ -914,7 +894,7 @@ input, textarea, select { font-family: inherit; }
   align-items: stretch;
 }
 
-/* ── CATEGORY SUBCARD ── */
+/*  */
 .hd-subcard {
   display: flex;
   flex-direction: column;
@@ -1126,9 +1106,7 @@ input, textarea, select { font-family: inherit; }
 }
 
 
-/* ─────────────────────────────────────────────
-   DASHBOARD VIEW
-───────────────────────────────────────────── */
+/* DASHBOARD VIEW */
 .hd-dashboard-view {
   display: flex;
   flex-direction: column;
@@ -1877,9 +1855,7 @@ input, textarea, select { font-family: inherit; }
   .mini-progress { width: 88px; }
 }
 
-/* ─────────────────────────────────────────────
-   PROFILE PAGE (MODERN UI)
-───────────────────────────────────────────── */
+/* PROFILE PAGE (MODERN UI) */
 .hd-profile-view {
   padding: 24px;
   max-width: 1200px;
@@ -2280,9 +2256,7 @@ input, textarea, select { font-family: inherit; }
   background: var(--bg);
 }
 
-/* ─────────────────────────────────────────────
-   INTERVIEW DASHBOARD STYLES
-───────────────────────────────────────────── */
+/* INTERVIEW DASHBOARD STYLES */
 
 /* Main grid inside interview tab */
 .interview-dashboard-grid {
@@ -2602,9 +2576,7 @@ input, textarea, select { font-family: inherit; }
   }
 }
 
-/* ─────────────────────────────────────────────
-   ENHANCED PROFILE DASHBOARD (MODERN ANALYTICS UI)
-───────────────────────────────────────────── */
+/* ENHANCED PROFILE DASHBOARD (MODERN ANALYTICS UI) */
 
 /* Gamification Stats Row */
 .gamification-stats-row {
@@ -3539,7 +3511,7 @@ input, textarea, select { font-family: inherit; }
   color: var(--text);
 }
 
-/* ── ATTEMPT INSPECTION MODAL ── */
+/*  */
 .attempt-modal-overlay {
   position: fixed;
   inset: 0;
@@ -3995,9 +3967,7 @@ input, textarea, select { font-family: inherit; }
   }
 }
 
-/* ─────────────────────────────────────────────
-   AUTH SCREEN
-───────────────────────────────────────────── */
+/* AUTH SCREEN */
 .hd-auth-bg {
   min-height: 100vh;
   display: flex;
@@ -4128,9 +4098,7 @@ input, textarea, select { font-family: inherit; }
 }
 .hd-back-link:hover { text-decoration: underline; }
 
-/* ─────────────────────────────────────────────
-   GLOBAL TOAST NOTIFICATIONS (CRISP ELEVATION)
-───────────────────────────────────────────── */
+/* GLOBAL TOAST NOTIFICATIONS (CRISP ELEVATION) */
 .Toastify__toast-container {
   z-index: 999999 !important;
   max-width: calc(100vw - 32px) !important;
@@ -4167,9 +4135,7 @@ input, textarea, select { font-family: inherit; }
   border-left: 5px solid #4f46e5 !important;
 }
 
-/* ─────────────────────────────────────────────
-   GLOBAL AUTH MODAL (GUEST BROWSING)
-───────────────────────────────────────────── */
+/* GLOBAL AUTH MODAL (GUEST BROWSING) */
 .hd-auth-modal-overlay {
   position: fixed;
   inset: 0;
@@ -4457,9 +4423,7 @@ input, textarea, select { font-family: inherit; }
   gap: 12px;
 }
 
-/* ─────────────────────────────────────────────
-   LEADERBOARD
-───────────────────────────────────────────── */
+/* LEADERBOARD */
 .lb-page {
   min-height: 100vh;
   background: var(--bg);
@@ -4614,9 +4578,7 @@ input, textarea, select { font-family: inherit; }
 .lb-date-col  { text-align: right; color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
 .lb-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
 
-/* ─────────────────────────────────────────────
-   PLAYGROUND
-───────────────────────────────────────────── */
+/* PLAYGROUND */
 .playground-container {
   min-height: 100vh;
   background: var(--bg);
@@ -5230,9 +5192,7 @@ input, textarea, select { font-family: inherit; }
   top: 24px;
 }
 
-/* ─────────────────────────────────────────────
-   SCORE SUMMARY
-───────────────────────────────────────────── */
+/* SCORE SUMMARY */
 .ss-page {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
   background: linear-gradient(135deg, #eef2ff 0%, #f0fdf4 50%, #faf5ff 100%);
@@ -5278,9 +5238,7 @@ input, textarea, select { font-family: inherit; }
 }
 .ss-home-btn:hover { background: linear-gradient(135deg, var(--brand-dark), #6d28d9); transform: translateY(-1px); }
 
-/* ─────────────────────────────────────────────
-   MOCK INTERVIEW
-───────────────────────────────────────────── */
+/* MOCK INTERVIEW */
 .dashboard-container { min-height: 100vh; background: var(--bg); }
 .app-shell { padding: 32px 20px; }
 .auth-card {
@@ -5307,11 +5265,9 @@ input, textarea, select { font-family: inherit; }
 .fa-spin { animation: fa-spin 1s linear infinite; }
 @keyframes fa-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-/* ─────────────────────────────────────────────
-   RESPONSIVE BREAKPOINTS
-───────────────────────────────────────────── */
+/* RESPONSIVE BREAKPOINTS */
 
-/* ── ≥1440px : 5 columns ── */
+/*  */
 @media (min-width: 1440px) {
   .hd-subcards-grid {
     grid-template-columns: repeat(5, 1fr);
@@ -5319,14 +5275,14 @@ input, textarea, select { font-family: inherit; }
   :root { --sidebar-w: 260px; }
 }
 
-/* ── 1024–1439px : 4 columns ── */
+/*  */
 @media (min-width: 1024px) and (max-width: 1439px) {
   .hd-subcards-grid {
     grid-template-columns: repeat(4, 1fr);
   }
 }
 
-/* ── 768–1024px (tablet landscape / small laptop) ── */
+/*  */
 @media (min-width: 768px) and (max-width: 1024px) {
   .hd-subcards-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -5336,7 +5292,7 @@ input, textarea, select { font-family: inherit; }
   }
 }
 
-/* ── <=1024px : Collapse sidebar into drawer ── */
+/*  */
 @media (max-width: 1024px) {
   /* Shell becomes single column – sidebar is out of flow */
   .hd-shell {
@@ -5402,7 +5358,7 @@ input, textarea, select { font-family: inherit; }
   }
 }
 
-/* ── <769px : mobile spacing and grid adjustments ── */
+/*  */
 @media (max-width: 768px) {
   /* Category section padding */
   .hd-categories {
@@ -5457,7 +5413,7 @@ input, textarea, select { font-family: inherit; }
   .hd-auth-card { padding: 24px 18px; }
 }
 
-/* ── 480–599px ── */
+/*  */
 @media (max-width: 599px) {
   .hd-subcards-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -5483,7 +5439,7 @@ input, textarea, select { font-family: inherit; }
   .levels-grid { grid-template-columns: 1fr; }
 }
 
-/* ── 425px and below ── */
+/*  */
 @media (max-width: 425px) {
   .hd-subcards-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -5499,7 +5455,7 @@ input, textarea, select { font-family: inherit; }
   .lb-table-wrap { margin: 0; }
 }
 
-/* ── 375px ── */
+/*  */
 @media (max-width: 375px) {
   .hd-subcards-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -5508,7 +5464,7 @@ input, textarea, select { font-family: inherit; }
   .hd-subcard-body { padding: 8px 10px; gap: 4px; }
 }
 
-/* ── <320px ── */
+/*  */
 @media (max-width: 320px) {
   .hd-subcards-grid {
     grid-template-columns: 1fr;
@@ -5627,9 +5583,7 @@ input, textarea, select { font-family: inherit; }
   }
 }
 
-/* ─────────────────────────────────────────────
-   PROFILE & INTERVIEW DASHBOARD STYLES
-───────────────────────────────────────────── */
+/* PROFILE & INTERVIEW DASHBOARD STYLES */
 
 /* Avatar Image & Overlay Upload */
 .profile-avatar-container {
@@ -6849,9 +6803,7 @@ input, textarea, select { font-family: inherit; }
   gap: 8px;
 }
 
-/* ─────────────────────────────────────────────
-   GLOBAL APPLICATION FOOTER
-───────────────────────────────────────────── */
+/* GLOBAL APPLICATION FOOTER */
 .hd-app-footer {
   margin-top: auto;
   width: 100%;

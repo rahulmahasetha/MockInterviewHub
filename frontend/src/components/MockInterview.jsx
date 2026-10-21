@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { interviewAPI, leaderboardAPI } from '../services/api';
 import { useUserProgress } from '../context/UserProgressContext';
-import { FaRobot, FaArrowLeft, FaCheckCircle, FaSpinner, FaMicrophone, FaStop, FaHistory, FaChartBar } from 'react-icons/fa';
+import { FaRobot, FaArrowLeft, FaCheckCircle, FaSpinner, FaMicrophone, FaStop, FaHistory, FaChartBar, FaEdit } from 'react-icons/fa';
 import PreInterviewCheck from './PreInterviewCheck';
 import MiniProctoring from './MiniProctoring';
 
@@ -301,16 +301,16 @@ export default function MockInterview() {
                 <button 
                   type="button" 
                   onClick={() => setInterviewMode('written')}
-                  style={{ flex: 1, padding: '12px', borderRadius: '6px', border: interviewMode === 'written' ? '2px solid #2563eb' : '1px solid #cbd5e1', background: interviewMode === 'written' ? '#eff6ff' : '#fff', fontWeight: 600, color: interviewMode === 'written' ? '#1d4ed8' : '#64748b', cursor: 'pointer', transition: 'all 0.2s' }}
+                  style={{ flex: 1, padding: '12px', borderRadius: '6px', border: interviewMode === 'written' ? '2px solid #2563eb' : '1px solid #cbd5e1', background: interviewMode === 'written' ? '#eff6ff' : '#fff', fontWeight: 600, color: interviewMode === 'written' ? '#1d4ed8' : '#64748b', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                 >
-                  ✍️ Written
+                  <FaEdit /> Written
                 </button>
                 <button 
                   type="button" 
                   onClick={() => setInterviewMode('speaking')}
-                  style={{ flex: 1, padding: '12px', borderRadius: '6px', border: interviewMode === 'speaking' ? '2px solid #2563eb' : '1px solid #cbd5e1', background: interviewMode === 'speaking' ? '#eff6ff' : '#fff', fontWeight: 600, color: interviewMode === 'speaking' ? '#1d4ed8' : '#64748b', cursor: 'pointer', transition: 'all 0.2s' }}
+                  style={{ flex: 1, padding: '12px', borderRadius: '6px', border: interviewMode === 'speaking' ? '2px solid #2563eb' : '1px solid #cbd5e1', background: interviewMode === 'speaking' ? '#eff6ff' : '#fff', fontWeight: 600, color: interviewMode === 'speaking' ? '#1d4ed8' : '#64748b', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                 >
-                  🎤 Speaking
+                  <FaMicrophone /> Speaking
                 </button>
               </div>
             </div>

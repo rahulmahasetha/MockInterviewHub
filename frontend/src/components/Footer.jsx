@@ -1,6 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useUserProgress } from '../context/UserProgressContext';
+import {
+  FiZap, FiFileText, FiShield, FiAward,
+  FiMonitor, FiLayers, FiServer, FiSettings,
+  FiBarChart2, FiCode, FiGlobe, FiArrowUp,
+  FiUser, FiGift
+} from 'react-icons/fi';
+import { MdOutlinePsychology, MdSecurity } from 'react-icons/md';
+import { SiDocker } from 'react-icons/si';
 
 export default function Footer({ setActiveNav, navigate }) {
   const { requireAuth } = useUserProgress();
@@ -16,46 +24,59 @@ export default function Footer({ setActiveNav, navigate }) {
     }
   };
 
+  const highlights = [
+    {
+      icon: <FiZap className="hl-icon" />,
+      title: 'Real-Time AI Evaluation',
+      desc: 'Instant scoring on technical accuracy & communication'
+    },
+    {
+      icon: <FiFileText className="hl-icon" />,
+      title: 'ATS & Resume Tailored',
+      desc: 'Interview questions mapped to your actual projects'
+    },
+    {
+      icon: <FiShield className="hl-icon" />,
+      title: 'Proctored Environment',
+      desc: 'Camera, tab-switch & multi-person proctoring checks'
+    },
+    {
+      icon: <FiAward className="hl-icon" />,
+      title: 'Gamified Learning',
+      desc: 'Earn practice coins, level streaks & climb leaderboard'
+    }
+  ];
+
+  const skillTracks = [
+    { id: 'fe', label: 'Frontend Engineering', icon: <FiLayers size={13} /> },
+    { id: 'be', label: 'Backend & APIs', icon: <FiServer size={13} /> },
+    { id: 'core', label: 'Core CS (OS, DBMS, CN)', icon: <FiSettings size={13} /> },
+    { id: 'devops', label: 'DevOps & Docker / K8s', icon: <SiDocker size={12} /> },
+    { id: 'ai', label: 'AI, ML & Deep Learning', icon: <MdOutlinePsychology size={14} /> },
+    { id: 'security', label: 'Cyber Security Defense', icon: <MdSecurity size={14} /> },
+  ];
+
   return (
     <footer className="hd-app-footer">
-      {/* Top Highlights Banner */}
+      {/* Highlights Banner */}
       <div className="footer-highlights-banner">
-        <div className="highlight-item">
-          <span className="hl-icon">⚡</span>
-          <div>
-            <strong>Real-Time AI Evaluation</strong>
-            <p>Instant scoring on technical accuracy & communication</p>
+        {highlights.map((h, i) => (
+          <div key={i} className="highlight-item">
+            {h.icon}
+            <div>
+              <strong>{h.title}</strong>
+              <p>{h.desc}</p>
+            </div>
           </div>
-        </div>
-        <div className="highlight-item">
-          <span className="hl-icon">📄</span>
-          <div>
-            <strong>ATS & Resume Tailored</strong>
-            <p>Interview questions mapped to your actual projects</p>
-          </div>
-        </div>
-        <div className="highlight-item">
-          <span className="hl-icon">🛡️</span>
-          <div>
-            <strong>Proctored Environment</strong>
-            <p>Camera, tab-switch & multi-person proctoring checks</p>
-          </div>
-        </div>
-        <div className="highlight-item">
-          <span className="hl-icon">🏆</span>
-          <div>
-            <strong>Gamified Learning</strong>
-            <p>Earn practice coins, level streaks & climb leaderboard</p>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Main Footer Content */}
+      {/* Main Footer Grid */}
       <div className="footer-main-grid">
         {/* Brand Column */}
         <div className="footer-brand-col">
           <div className="footer-logo">
-            <span className="f-logo-icon">🎓</span>
+            <FiAward className="f-logo-icon" color="#60a5fa" size={24} />
             <span className="f-logo-text">MockInterviewHub</span>
           </div>
           <p className="footer-brand-desc">
@@ -83,7 +104,7 @@ export default function Footer({ setActiveNav, navigate }) {
                   });
                 }}
               >
-                💻 Technical Mock Interview
+                <FiMonitor size={13} /> Technical Mock Interview
               </button>
             </li>
             <li>
@@ -97,35 +118,39 @@ export default function Footer({ setActiveNav, navigate }) {
                   });
                 }}
               >
-                📄 AI Resume Interview
+                <FiFileText size={13} /> AI Resume Interview
               </button>
             </li>
             <li>
-              <Link to="/resume-builder">📝 ATS Resume Builder</Link>
+              <Link to="/resume-builder" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <FiFileText size={13} /> ATS Resume Builder
+              </Link>
             </li>
             <li>
-              <button 
-                type="button" 
-                className="footer-link-btn" 
+              <button
+                type="button"
+                className="footer-link-btn"
                 onClick={() => handleNavClick('all')}
               >
-                🧠 Daily Quiz Challenges
+                <FiCode size={13} /> Daily Quiz Challenges
               </button>
             </li>
           </ul>
         </div>
 
-        {/* Platform & Navigation */}
+        {/* Platform Links */}
         <div className="footer-links-col">
           <h4 className="footer-col-title">Platform</h4>
           <ul className="footer-links-list">
             <li>
-              <Link to="/leaderboard">🏆 Global Leaderboard</Link>
+              <Link to="/leaderboard" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <FiAward size={13} /> Global Leaderboard
+              </Link>
             </li>
             <li>
-              <button 
-                type="button" 
-                className="footer-link-btn" 
+              <button
+                type="button"
+                className="footer-link-btn"
                 onClick={() => {
                   requireAuth('profile', () => handleNavClick('profile'), {
                     title: 'Sign in to View Profile',
@@ -133,90 +158,49 @@ export default function Footer({ setActiveNav, navigate }) {
                   });
                 }}
               >
-                📊 Performance Profile
+                <FiBarChart2 size={13} /> Performance Profile
               </button>
             </li>
             <li>
-              <button 
-                type="button" 
-                className="footer-link-btn" 
+              <button
+                type="button"
+                className="footer-link-btn"
                 onClick={() => handleNavClick('dashboard')}
               >
-                🪙 Rewards & Coin Hub
+                <FiGift size={13} /> Rewards & Coin Hub
               </button>
             </li>
             <li>
-              <Link to="/interview">🛡️ Pre-Interview Check</Link>
+              <Link to="/interview" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <FiShield size={13} /> Pre-Interview Check
+              </Link>
             </li>
           </ul>
         </div>
 
-        {/* Skill Domains */}
+        {/* Skill Tracks */}
         <div className="footer-links-col">
           <h4 className="footer-col-title">Skill Tracks</h4>
           <ul className="footer-links-list">
+            {skillTracks.map(track => (
+              <li key={track.id}>
+                <button
+                  type="button"
+                  className="footer-link-btn"
+                  onClick={() => handleNavClick(track.id)}
+                >
+                  {track.icon} {track.label}
+                </button>
+              </li>
+            ))}
             <li>
-              <button 
-                type="button" 
-                className="footer-link-btn" 
-                onClick={() => handleNavClick('fe')}
-              >
-                ▭ Frontend Engineering
-              </button>
-            </li>
-            <li>
-              <button 
-                type="button" 
-                className="footer-link-btn" 
-                onClick={() => handleNavClick('be')}
-              >
-                ◈ Backend & APIs
-              </button>
-            </li>
-            <li>
-              <button 
-                type="button" 
-                className="footer-link-btn" 
-                onClick={() => handleNavClick('core')}
-              >
-                ⚙️ Core CS (OS, DBMS, CN)
-              </button>
-            </li>
-            <li>
-              <button 
-                type="button" 
-                className="footer-link-btn" 
-                onClick={() => handleNavClick('devops')}
-              >
-                🚀 DevOps & Docker / K8s
-              </button>
-            </li>
-            <li>
-              <button 
-                type="button" 
-                className="footer-link-btn" 
-                onClick={() => handleNavClick('ai')}
-              >
-                🤖 AI, ML & Deep Learning
-              </button>
-            </li>
-            <li>
-              <button 
-                type="button" 
-                className="footer-link-btn" 
-                onClick={() => handleNavClick('security')}
-              >
-                🛡️ Cyber Security Defense
-              </button>
-            </li>
-            <li>
-              <button 
-                type="button" 
-                className="footer-link-btn" 
+              <button
+                type="button"
+                className="footer-link-btn"
                 onClick={() => handleNavClick('all')}
                 style={{ fontWeight: 600, color: '#60a5fa' }}
               >
-                🌐 View All 10 Tracks →
+                <FiGlobe size={13} /> View All 10 Tracks →
               </button>
             </li>
             <li>
@@ -235,7 +219,7 @@ export default function Footer({ setActiveNav, navigate }) {
         </div>
         <div className="footer-bottom-right">
           <button type="button" className="footer-back-to-top" onClick={scrollToTop}>
-            ↑ Back to Top
+            <FiArrowUp size={14} /> Back to Top
           </button>
         </div>
       </div>

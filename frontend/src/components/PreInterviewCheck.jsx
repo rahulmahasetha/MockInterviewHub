@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaCheckCircle, FaExclamationTriangle, FaDesktop, FaVideo, FaMicrophone, FaExpand } from 'react-icons/fa';
+import { FaCheckCircle, FaExclamationTriangle, FaDesktop, FaVideo, FaMicrophone, FaExpand, FaClipboardList, FaTools } from 'react-icons/fa';
 
 export default function PreInterviewCheck({ onComplete, title = "Interview Instructions & Proctoring Check" }) {
   const [cameraReady, setCameraReady] = useState(false);
@@ -79,7 +79,7 @@ export default function PreInterviewCheck({ onComplete, title = "Interview Instr
 
         <div className="split-view">
           <div className="instructions-section">
-            <h3>📝 Important Instructions</h3>
+            <h3><FaClipboardList style={{ marginRight: '8px' }} /> Important Instructions</h3>
             <ul className="rules-list">
               <li><strong>Do not exit fullscreen</strong> during the session.</li>
               <li><strong>Do not switch tabs</strong> or open other applications.</li>
@@ -99,7 +99,7 @@ export default function PreInterviewCheck({ onComplete, title = "Interview Instr
           </div>
 
           <div className="hardware-section">
-            <h3>🔧 System Checks</h3>
+            <h3><FaTools style={{ marginRight: '8px' }} /> System Checks</h3>
             <div className="video-preview-box">
               <video ref={videoRef} autoPlay muted playsInline />
               {!cameraReady && <div className="no-video"><FaVideo /> Camera required</div>}

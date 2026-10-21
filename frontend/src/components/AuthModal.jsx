@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUserProgress } from '../context/UserProgressContext';
+import { FiAlertCircle, FiAward, FiX } from 'react-icons/fi';
 
 export default function AuthModal({ onAuthSuccess }) {
   const {
@@ -133,11 +134,11 @@ export default function AuthModal({ onAuthSuccess }) {
           title="Close and continue browsing"
           aria-label="Close auth dialog"
         >
-          ✕
+          <FiX />
         </button>
 
         <div className="hd-auth-logo">
-          <span className="hd-logo-icon">🎓</span>
+          <FiAward className="hd-logo-icon" size={24} color="#6366f1" />
           <span className="hd-logo-text">MockInterviewHub</span>
         </div>
 
@@ -187,7 +188,7 @@ export default function AuthModal({ onAuthSuccess }) {
 
         {errorMessage && (
           <div className="hd-auth-error-alert" role="alert">
-            <span className="hd-auth-error-icon">⚠️</span>
+            <FiAlertCircle className="hd-auth-error-icon" size={16} />
             <span className="hd-auth-error-text">{errorMessage}</span>
           </div>
         )}

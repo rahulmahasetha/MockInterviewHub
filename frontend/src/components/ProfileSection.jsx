@@ -2,6 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import { interviewAPI, resumeAPI } from '../services/api';
 import { useUserProgress } from '../context/UserProgressContext';
+import {
+  FiCpu, FiFileText, FiTarget, FiBookOpen, FiCamera,
+  FiSettings, FiAward, FiZap, FiCircle, FiCheckCircle,
+  FiClipboard, FiTrendingUp, FiInfo, FiEye, FiCheck,
+  FiArrowUp, FiRotateCcw, FiX
+} from 'react-icons/fi';
 
 export default function ProfileSection({
   progress: propsProgress,
@@ -305,7 +311,7 @@ export default function ProfileSection({
       coinsEarned: i.coinsEarned || 0,
       date: new Date(i.date),
       color: '#2563eb',
-      icon: '💻',
+      icon: <FiCpu />,
       feedback: i.feedbackSummary,
       raw: i
     }));
@@ -326,7 +332,7 @@ export default function ProfileSection({
       coinsEarned: r.coinsEarned || 0,
       date: new Date(r.date),
       color: '#7c3aed',
-      icon: '📄',
+      icon: <FiFileText />,
       feedback: r.hiringRecommendation,
       raw: r
     }));
@@ -415,7 +421,7 @@ export default function ProfileSection({
         id: 'plan-tech',
         priority: 'High Priority',
         priorityBadge: 'plan-badge-high',
-        icon: '💻',
+        icon: <FiCpu />,
         domain: 'Technical Interview',
         title: `Strengthen: ${techMetrics.areas[0]}`,
         action: `Review architectural concepts, edge cases, and code structuring related to ${techMetrics.areas[0].toLowerCase()}.`,
@@ -430,7 +436,7 @@ export default function ProfileSection({
         id: 'plan-resume',
         priority: 'High Priority',
         priorityBadge: 'plan-badge-high',
-        icon: '📄',
+        icon: <FiFileText />,
         domain: 'Resume Articulation',
         title: `Refine: ${resumeMetrics.areas[0]}`,
         action: `Use the STAR format (Situation, Task, Action, Result) to clearly articulate metrics and lessons for ${resumeMetrics.areas[0].toLowerCase()}.`,
@@ -445,7 +451,7 @@ export default function ProfileSection({
         id: 'plan-tech-2',
         priority: 'Medium Priority',
         priorityBadge: 'plan-badge-med',
-        icon: '🎯',
+        icon: <FiTarget />,
         domain: 'Technical Interview',
         title: `Practice: ${techMetrics.areas[1]}`,
         action: `Work through targeted mock questions on ${techMetrics.areas[1].toLowerCase()} to enhance interview confidence.`,
@@ -460,7 +466,7 @@ export default function ProfileSection({
         id: 'plan-quiz',
         priority: 'Recommended Practice',
         priorityBadge: 'plan-badge-rec',
-        icon: '🧠',
+        icon: <FiBookOpen />,
         domain: 'Daily Quizzes',
         title: `Complete: ${quizMetrics.areas[0]}`,
         action: 'Clear remaining quiz questions to reinforce your knowledge and earn coin bonuses.',
@@ -476,7 +482,7 @@ export default function ProfileSection({
           id: 'starter-1',
           priority: 'Recommended Step',
           priorityBadge: 'plan-badge-rec',
-          icon: '💻',
+          icon: <FiCpu />,
           domain: 'Technical Practice',
           title: 'Take Your First Technical Mock Interview',
           action: 'Choose your target role (Java, React, Frontend, Backend) to benchmark your technical explanations and problem-solving.',
@@ -487,7 +493,7 @@ export default function ProfileSection({
           id: 'starter-2',
           priority: 'Recommended Step',
           priorityBadge: 'plan-badge-rec',
-          icon: '📄',
+          icon: <FiFileText />,
           domain: 'Resume Analysis',
           title: 'Practice Resume-Based Questions',
           action: 'Upload your resume to test whether you can clearly justify your past projects, stack choices, and achievements.',
@@ -498,7 +504,7 @@ export default function ProfileSection({
           id: 'starter-3',
           priority: 'Recommended Step',
           priorityBadge: 'plan-badge-rec',
-          icon: '🧠',
+          icon: <FiBookOpen />,
           domain: 'Skill Drills',
           title: 'Solve Daily Quizzes',
           action: 'Answer multiple-choice challenges in HTML, CSS, React, and Programming to keep your learning streak active.',
@@ -578,7 +584,7 @@ export default function ProfileSection({
               <div className="profile-avatar-large">{progress.username?.[0]?.toUpperCase()}</div>
             )}
             <div className="profile-avatar-overlay">
-              <span>📸 Change</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><FiCamera /> Change</span>
             </div>
             <input
               type="file"
@@ -607,33 +613,33 @@ export default function ProfileSection({
               disabled={isResettingCoins}
               title="Reset all coins balance to 0"
             >
-              <span>↺</span> {isResettingCoins ? 'Resetting...' : 'Reset All Coins'}
+              <span style={{ display: 'inline-flex', alignItems: 'center', marginRight: '6px' }}><FiRotateCcw /></span> {isResettingCoins ? 'Resetting...' : 'Reset All Coins'}
             </button>
             <button className="btn-primary" onClick={openProfileSettings} title="Edit profile settings">
-              <span>⚙️</span> Settings
+              <span style={{ display: 'inline-flex', alignItems: 'center', marginRight: '6px' }}><FiSettings /></span> Settings
             </button>
           </div>
         </div>
       </div>
 
-      {/* ── 2. GAMIFICATION SUMMARY BAR ── */}
+      {/* Gamification Summary Bar */}
       <div className="profile-stats-row gamification-stats-row">
         <div className="stat-card">
-          <div className="stat-icon stat-icon-purple">🏆</div>
+          <div className="stat-icon stat-icon-purple"><FiAward /></div>
           <div className="stat-info">
             <div className="stat-value">{totalScore || XP}</div>
             <div className="stat-label">Total Score ({XP} XP)</div>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon stat-icon-orange">🔥</div>
+          <div className="stat-icon stat-icon-orange"><FiZap /></div>
           <div className="stat-info">
             <div className="stat-value">{progress.streakDays || 1} Days</div>
             <div className="stat-label">Learning Streak</div>
           </div>
         </div>
         <div className="stat-card stat-card-coins">
-          <div className="stat-icon stat-icon-blue">🪙</div>
+          <div className="stat-icon stat-icon-blue"><FiCircle /></div>
           <div className="stat-info">
             <div className="stat-value-with-action">
               <div className="stat-value">{progress.coins || 0}</div>
@@ -645,7 +651,7 @@ export default function ProfileSection({
                   disabled={isResettingCoins}
                   title="Reset all coins to 0"
                 >
-                  ↺ Reset
+                  <FiRotateCcw style={{ marginRight: '4px' }} /> Reset
                 </button>
               )}
             </div>
@@ -653,7 +659,7 @@ export default function ProfileSection({
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon stat-icon-green">✅</div>
+          <div className="stat-icon stat-icon-green"><FiCheckCircle /></div>
           <div className="stat-info">
             <div className="stat-value">{completedSections}</div>
             <div className="stat-label">Quizzes Passed</div>
@@ -697,13 +703,13 @@ export default function ProfileSection({
               </p>
               <div className="overall-pill-metrics">
                 <span className="meta-pill">
-                  💻 Tech: {techMetrics.avgScore !== null ? `${techMetrics.avgScore}%` : 'N/A'}
+                  <FiCpu style={{ marginRight: '4px' }} /> Tech: {techMetrics.avgScore !== null ? `${techMetrics.avgScore}%` : 'N/A'}
                 </span>
                 <span className="meta-pill">
-                  📄 Resume: {resumeMetrics.avgScore !== null ? `${resumeMetrics.avgScore}%` : 'N/A'}
+                  <FiFileText style={{ marginRight: '4px' }} /> Resume: {resumeMetrics.avgScore !== null ? `${resumeMetrics.avgScore}%` : 'N/A'}
                 </span>
                 <span className="meta-pill">
-                  🧠 Quiz: {quizMetrics.score !== null ? `${quizMetrics.score}%` : 'N/A'}
+                  <FiBookOpen style={{ marginRight: '4px' }} /> Quiz: {quizMetrics.score !== null ? `${quizMetrics.score}%` : 'N/A'}
                 </span>
               </div>
             </div>
@@ -759,7 +765,7 @@ export default function ProfileSection({
           </div>
 
           <div className="readiness-synthesis-box">
-            <span className="synthesis-icon">📋</span>
+            <span className="synthesis-icon"><FiClipboard /></span>
             <p className="synthesis-text">{careerReadiness.summary}</p>
           </div>
         </div>
@@ -775,7 +781,7 @@ export default function ProfileSection({
         {/* Card 1: Technical Interview */}
         <div className="profile-section-score-card">
           <div className="section-card-top">
-            <div className="section-icon-badge tech-badge">💻</div>
+            <div className="section-icon-badge tech-badge"><FiCpu /></div>
             <div className="section-title-wrap">
               <h3>Technical Interview</h3>
               <span className="section-session-count">{techMetrics.count} sessions completed</span>
@@ -822,7 +828,7 @@ export default function ProfileSection({
                   {techMetrics.strengths.length > 0 ? (
                     techMetrics.strengths.map((s, idx) => (
                       <span key={idx} className="tag-badge strength-badge">
-                        ✓ {s}
+                        <FiCheck style={{ marginRight: '4px' }} /> {s}
                       </span>
                     ))
                   ) : (
@@ -875,7 +881,7 @@ export default function ProfileSection({
                             coinsEarned: iv.coinsEarned || 0,
                             date: dateObj,
                             color: '#2563eb',
-                            icon: '💻',
+                            icon: <FiCpu />,
                             feedback: iv.feedbackSummary,
                             raw: iv
                           })}
@@ -909,7 +915,7 @@ export default function ProfileSection({
         {/* Card 2: Resume-Based Interview */}
         <div className="profile-section-score-card">
           <div className="section-card-top">
-            <div className="section-icon-badge resume-badge">📄</div>
+            <div className="section-icon-badge resume-badge"><FiFileText /></div>
             <div className="section-title-wrap">
               <h3>Resume Interview</h3>
               <span className="section-session-count">{resumeMetrics.count} sessions completed</span>
@@ -956,7 +962,7 @@ export default function ProfileSection({
                   {resumeMetrics.strengths.length > 0 ? (
                     resumeMetrics.strengths.map((s, idx) => (
                       <span key={idx} className="tag-badge strength-badge">
-                        ✓ {s}
+                        <FiCheck style={{ marginRight: '4px' }} /> {s}
                       </span>
                     ))
                   ) : (
@@ -1010,7 +1016,7 @@ export default function ProfileSection({
                             coinsEarned: rv.coinsEarned || 0,
                             date: dateObj,
                             color: '#7c3aed',
-                            icon: '📄',
+                            icon: <FiFileText />,
                             feedback: rv.hiringRecommendation,
                             raw: rv
                           })}
@@ -1044,7 +1050,7 @@ export default function ProfileSection({
         {/* Card 3: Quiz Performance */}
         <div className="profile-section-score-card">
           <div className="section-card-top">
-            <div className="section-icon-badge quiz-badge">🧠</div>
+            <div className="section-icon-badge quiz-badge"><FiBookOpen /></div>
             <div className="section-title-wrap">
               <h3>Quiz Performance</h3>
               <span className="section-session-count">
@@ -1093,7 +1099,7 @@ export default function ProfileSection({
                   {quizMetrics.strengths.length > 0 ? (
                     quizMetrics.strengths.map((s, idx) => (
                       <span key={idx} className="tag-badge strength-badge">
-                        ✓ {s}
+                        <FiCheck style={{ marginRight: '4px' }} /> {s}
                       </span>
                     ))
                   ) : (
@@ -1108,7 +1114,7 @@ export default function ProfileSection({
                   {quizMetrics.areas.length > 0 ? (
                     quizMetrics.areas.map((a, idx) => (
                       <span key={idx} className="tag-badge improvement-badge">
-                        ▲ {a}
+                        <FiArrowUp style={{ marginRight: '4px' }} /> {a}
                       </span>
                     ))
                   ) : (
@@ -1152,7 +1158,7 @@ export default function ProfileSection({
           <div className="card-body">
             {!chartData ? (
               <div className="chart-empty-state">
-                <div className="empty-chart-icon">📈</div>
+                <div className="empty-chart-icon"><FiTrendingUp /></div>
                 <h4>No Previous Attempts Yet</h4>
                 <p className="text-muted">
                   Complete your first Technical or Resume mock interview to generate an interactive score
@@ -1292,7 +1298,7 @@ export default function ProfileSection({
                   </svg>
                   {chronologicalAttempts.length === 1 && (
                     <div className="chart-single-attempt-hint">
-                      <span>💡 1 session recorded ({chronologicalAttempts[0].score}%). Complete more sessions to view your score trend line.</span>
+                      <span><FiInfo style={{ marginRight: '6px' }} /> 1 session recorded ({chronologicalAttempts[0].score}%). Complete more sessions to view your score trend line.</span>
                     </div>
                   )}
                 </div>
@@ -1330,13 +1336,13 @@ export default function ProfileSection({
                 className={`filter-pill ${historyFilter === 'tech' ? 'active' : ''}`}
                 onClick={() => setHistoryFilter('tech')}
               >
-                💻 Technical ({interviews.length})
+                <FiCpu style={{ marginRight: '6px' }} /> Technical ({interviews.length})
               </button>
               <button
                 className={`filter-pill ${historyFilter === 'resume' ? 'active' : ''}`}
                 onClick={() => setHistoryFilter('resume')}
               >
-                📄 Resume ({resumeInterviews.length})
+                <FiFileText style={{ marginRight: '6px' }} /> Resume ({resumeInterviews.length})
               </button>
             </div>
           </div>
@@ -1344,7 +1350,7 @@ export default function ProfileSection({
           <div className="card-body">
             {filteredAttempts.length === 0 ? (
               <div className="history-empty-notice">
-                <span className="empty-notice-icon">📋</span>
+                <span className="empty-notice-icon"><FiClipboard /></span>
                 <p>
                   {historyFilter === 'tech'
                     ? 'No Technical Interview sessions recorded yet. Practice a technical session to see your attempts!'
@@ -1447,7 +1453,7 @@ export default function ProfileSection({
                                 setSelectedAttempt(att);
                               }}
                             >
-                              View Details 👁
+                              <FiEye style={{ marginRight: '4px' }} /> View Details
                             </button>
                           </td>
                         </tr>
@@ -1486,7 +1492,7 @@ export default function ProfileSection({
                   <span className="am-score-lbl">Overall Score</span>
                 </div>
                 <button className="am-close-btn" onClick={() => setSelectedAttempt(null)} title="Close Details">
-                  ✕
+                  <FiX />
                 </button>
               </div>
             </div>
@@ -1516,7 +1522,7 @@ export default function ProfileSection({
                   {selectedAttempt.coinsEarned > 0 && (
                     <div className="am-sub-card">
                       <span className="am-sub-title">Reward Earned</span>
-                      <strong className="am-sub-val text-amber">🪙 +{selectedAttempt.coinsEarned} Coins</strong>
+                      <strong className="am-sub-val text-amber"><FiCircle style={{ marginRight: '4px' }} /> +{selectedAttempt.coinsEarned} Coins</strong>
                     </div>
                   )}
                 </div>
@@ -1529,7 +1535,7 @@ export default function ProfileSection({
                   {selectedAttempt.strengths?.length > 0 ? (
                     <div className="am-chips-wrap">
                       {selectedAttempt.strengths.map((s, idx) => (
-                        <div key={idx} className="am-chip am-chip-strength">✓ {s}</div>
+                        <div key={idx} className="am-chip am-chip-strength"><FiCheck style={{ marginRight: '4px' }} /> {s}</div>
                       ))}
                     </div>
                   ) : (
@@ -1542,7 +1548,7 @@ export default function ProfileSection({
                   {selectedAttempt.areas?.length > 0 ? (
                     <div className="am-chips-wrap">
                       {selectedAttempt.areas.map((a, idx) => (
-                        <div key={idx} className="am-chip am-chip-area">▲ {a}</div>
+                        <div key={idx} className="am-chip am-chip-area"><FiArrowUp style={{ marginRight: '4px' }} /> {a}</div>
                       ))}
                     </div>
                   ) : (

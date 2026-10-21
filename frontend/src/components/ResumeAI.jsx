@@ -11,9 +11,7 @@ import {
 import PreInterviewCheck from './PreInterviewCheck';
 import MiniProctoring from './MiniProctoring';
 
-/* ─────────────────────────────────────────────
-   PIPELINE STEP COMPONENT
-───────────────────────────────────────────── */
+/* Pipeline Step Component */
 const PipelineStep = ({ icon: Icon, label, active, done }) => (
   <div style={{
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
@@ -53,9 +51,7 @@ const PipelineConnector = ({ active }) => (
   </div>
 );
 
-/* ─────────────────────────────────────────────
-   SKILL TAG COMPONENT
-───────────────────────────────────────────── */
+/* Skill Tag Component */
 const SkillTag = ({ skill }) => (
   <span style={{
     display: 'inline-block', padding: '4px 10px', margin: '3px',
@@ -68,9 +64,7 @@ const SkillTag = ({ skill }) => (
   </span>
 );
 
-/* ─────────────────────────────────────────────
-   SCORE RING COMPONENT
-───────────────────────────────────────────── */
+/* Score Ring Component */
 const ScoreRing = ({ value = 0, label, color = '#6366f1', size = 90 }) => {
   const r = (size - 16) / 2;
   const circ = 2 * Math.PI * r;
@@ -194,7 +188,7 @@ export default function ResumeAI() {
         alert('Maximum proctoring violations reached. Auto-submitting interview.');
         finishInterview(true);
       } else {
-        alert(`⚠️ Warning ${n}/${MAX_VIOLATIONS}: Please stay on the interview page.`);
+        alert(`Warning ${n}/${MAX_VIOLATIONS}: Please stay on the interview page.`);
       }
       return n;
     });
@@ -239,7 +233,7 @@ export default function ResumeAI() {
     else { recognitionRef.current.start(); setIsRecording(true); }
   };
 
-  /* ─── UPLOAD PIPELINE ─────────────────── */
+  /* Upload Pipeline Handlers */
   const handleFileChange = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -491,7 +485,7 @@ export default function ResumeAI() {
     }
   };
 
-  /* ─── INTERVIEW ──────────────────────── */
+  /* Interview Execution Handlers */
   const toggleCategory = (cat) => {
     setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
   };
@@ -692,9 +686,7 @@ export default function ResumeAI() {
     } catch (e) { /* ignore */ }
   };
 
-  /* ───────────────────────────────────────
-     RENDER: UPLOAD PHASE
-  ─────────────────────────────────────── */
+  /* Render: Upload Phase */
   const renderUpload = () => (
     <div style={{ maxWidth: '760px', margin: '0 auto', padding: '40px 20px' }}>
       {/* Header */}
@@ -808,9 +800,7 @@ export default function ResumeAI() {
     </div>
   );
 
-  /* ───────────────────────────────────────
-     RENDER: CONFIG PHASE
-  ─────────────────────────────────────── */
+  /* Render: Config Phase */
   const renderConfig = () => {
     // If atsAnalysis is not yet available, dynamically calculate baseline metrics so user never sees 0s
     const activeAnalysis = atsAnalysis || computeClientAts(resumeData, jobDescriptionInput);
@@ -920,7 +910,7 @@ export default function ResumeAI() {
                 borderRadius: '12px', padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 color: '#fca5a5', fontSize: '0.88rem', flexWrap: 'wrap', gap: '10px'
               }}>
-                <span>⚠️ {atsScanError}</span>
+                <span><FaExclamationTriangle style={{ marginRight: '6px' }} /> {atsScanError}</span>
                 <button
                   onClick={() => runAtsScan(getEffectiveResumeText(), jobDescriptionInput)}
                   style={{
@@ -1050,7 +1040,7 @@ export default function ResumeAI() {
                         padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600,
                         background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', color: '#6ee7b7'
                       }}>
-                        ✓ {kw}
+                        <FaCheck style={{ marginRight: '4px' }} /> {kw}
                       </span>
                     ))}
                   </div>
@@ -1086,8 +1076,8 @@ export default function ResumeAI() {
                 ) : (
                   <div style={{ color: '#34d399', fontSize: '0.85rem' }}>All core high-impact keywords matched!</div>
                 )}
-                <div style={{ marginTop: '14px', fontSize: '0.76rem', color: '#94a3b8', lineHeight: 1.4 }}>
-                  💡 Tip: Incorporate these keywords into your skills list or project descriptions to satisfy automated resume screeners.
+                <div style={{ marginTop: '14px', fontSize: '0.76rem', color: '#94a3b8', lineHeight: 1.4, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FaLightbulb style={{ color: '#f59e0b', flexShrink: 0 }} /> Tip: Incorporate these keywords into your skills list or project descriptions to satisfy automated resume screeners.
                 </div>
               </div>
             </div>
@@ -1176,8 +1166,8 @@ export default function ResumeAI() {
                           {/* Improved */}
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-                                ✨ AI Improved Version (XYZ Formula)
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                                <FaMagic /> AI Improved Version (XYZ Formula)
                               </span>
                               <button
                                 onClick={() => handleCopyBullet(item.improved, idx)}
@@ -1235,7 +1225,7 @@ export default function ResumeAI() {
                       boxShadow: '0 0 20px rgba(99,102,241,0.4)', transition: 'all 0.2s'
                     }}
                   >
-                    Proceed to AI Interview Setup ➔
+                    Proceed to AI Interview Setup →
                   </button>
                 </div>
           </div>
@@ -1321,9 +1311,7 @@ export default function ResumeAI() {
     );
   };
 
-  /* ───────────────────────────────────────
-     RENDER: INTERVIEW PHASE
-  ─────────────────────────────────────── */
+  /* Render: Interview Phase */
   const renderInterview = () => {
     const currentQ = questionQueue[currentQuestionIndex];
     if (!currentQ) return (
@@ -1357,8 +1345,8 @@ export default function ResumeAI() {
             <div style={{ fontWeight: 700, color: '#e2e8f0', fontSize: '0.9rem' }}>
               Q {currentQuestionIndex + 1} / {questionQueue.length}
             </div>
-            <div style={{ color: violations > 0 ? '#f87171' : '#64748b', fontWeight: 600, fontSize: '0.85rem' }}>
-              ⚠️ {violations}/{MAX_VIOLATIONS} warnings
+            <div style={{ color: violations > 0 ? '#f87171' : '#64748b', fontWeight: 600, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <FaExclamationTriangle /> {violations}/{MAX_VIOLATIONS} warnings
             </div>
           </div>
         </div>
@@ -1447,9 +1435,7 @@ export default function ResumeAI() {
     );
   };
 
-  /* ───────────────────────────────────────
-     RENDER: REPORT PHASE
-  ─────────────────────────────────────── */
+  /* Render: Report Phase */
   const renderReport = () => {
     if (isGeneratingReport || !report) return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '70vh', gap: '20px' }}>
@@ -1558,9 +1544,7 @@ export default function ResumeAI() {
     );
   };
 
-  /* ───────────────────────────────────────
-     RENDER: HISTORY PHASE
-  ─────────────────────────────────────── */
+  /* Render: History Phase */
   const renderHistory = () => (
     <div style={{ maxWidth: '820px', margin: '0 auto', padding: '40px 20px' }}>
       <button onClick={() => setPhase('upload')} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '28px', fontWeight: 600 }}>
@@ -1597,9 +1581,7 @@ export default function ResumeAI() {
     </div>
   );
 
-  /* ───────────────────────────────────────
-     ROOT RENDER
-  ─────────────────────────────────────── */
+  /* Root Render */
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', padding: '24px 16px' }}>
       <style>{`

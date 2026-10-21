@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserProgress } from "../context/UserProgressContext";
 import { quizAPI, resumeAPI, interviewAPI } from "../services/api";
+import { FaTrophy, FaRobot } from "react-icons/fa";
+import { FiBarChart2, FiBookOpen, FiFileText } from "react-icons/fi";
 
 const TOPIC_CONFIG = {
   science: { abbr: "JV", name: "Java", bg: "#EA580C" },
@@ -211,7 +213,7 @@ export default function Leaderboard() {
           <div className="lb-card lb-quiz-score-card">
             <div className="lb-card-top-header">
               <div className="lb-trophy-badge">
-                <span role="img" aria-label="trophy">🏆</span>
+                <FaTrophy style={{ color: '#D97706', fontSize: '1.25rem' }} />
               </div>
               <div className="lb-metric-title-group">
                 <span className="lb-metric-label">
@@ -320,7 +322,7 @@ export default function Leaderboard() {
           <div className="lb-card lb-rankings-box">
             <div className="lb-box-header">
               <div className="lb-box-title-row">
-                <div className="lb-icon-box lb-purple-icon-box">📊</div>
+                <div className="lb-icon-box lb-purple-icon-box"><FiBarChart2 /></div>
                 <h2 className="lb-box-title">Global rankings</h2>
               </div>
               <button
@@ -415,7 +417,7 @@ export default function Leaderboard() {
           <div className="lb-card lb-topics-box">
             <div className="lb-box-header">
               <div className="lb-box-title-row">
-                <div className="lb-icon-box lb-purple-icon-box">📖</div>
+                <div className="lb-icon-box lb-purple-icon-box"><FiBookOpen /></div>
                 <div>
                   <h2 className="lb-box-title">Explore Topics</h2>
                   <p className="lb-box-subtitle">Select a topic to start a quiz</p>
@@ -559,7 +561,7 @@ export default function Leaderboard() {
           <div className="lb-card lb-history-box">
             <div className="lb-box-header">
               <div className="lb-box-title-row">
-                <div className="lb-icon-box lb-purple-icon-box">🤖</div>
+                <div className="lb-icon-box lb-purple-icon-box"><FaRobot /></div>
                 <div>
                   <h2 className="lb-box-title">My Technical Interview History</h2>
                   <p className="lb-box-subtitle">Your technical interview attempts and scores</p>
@@ -621,7 +623,7 @@ export default function Leaderboard() {
           <div className="lb-card lb-history-box">
             <div className="lb-box-header">
               <div className="lb-box-title-row">
-                <div className="lb-icon-box lb-purple-icon-box">📄</div>
+                <div className="lb-icon-box lb-purple-icon-box"><FiFileText /></div>
                 <div>
                   <h2 className="lb-box-title">My Resume Interview History</h2>
                   <p className="lb-box-subtitle">Your resume interview attempts and scores</p>
@@ -683,9 +685,7 @@ export default function Leaderboard() {
 }
 
 const modernStyles = `
-/* ─────────────────────────────────────────────────────────
-   LEARNING LEADERBOARD - LATEST REFERENCE DESIGN
-───────────────────────────────────────────────────────── */
+/* Learning Leaderboard Styles */
 
 .lb-modern-page {
   min-height: 100vh;
@@ -773,7 +773,7 @@ const modernStyles = `
   overflow: hidden;
 }
 
-/* ─── 1. TOP METRIC GRID ─── */
+/* 1. Top Metric Grid */
 .lb-top-metric-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -936,7 +936,7 @@ const modernStyles = `
   z-index: 1;
 }
 
-/* ─── 2. MIDDLE ROW ─── */
+/* 2. Middle Row */
 .lb-mid-metric-grid {
   display: grid;
   grid-template-columns: 46% 54%;
@@ -1319,7 +1319,7 @@ const modernStyles = `
   transition: left 0.15s ease-out;
 }
 
-/* ─── 3. BOTTOM ROW ─── */
+/* 3. Bottom Row */
 .lb-bottom-metric-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1365,7 +1365,7 @@ const modernStyles = `
   color: #64748B;
 }
 
-/* ─── RESPONSIVE BREAKPOINTS ─── */
+/* Responsive Breakpoints */
 @media (max-width: 1080px) {
   .lb-top-metric-grid {
     grid-template-columns: 1fr;

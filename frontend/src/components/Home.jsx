@@ -5,6 +5,12 @@ import { quizAPI, usersAPI } from "../services/api";
 import { toast } from "react-toastify";
 import ProfileSection from "./ProfileSection";
 import Footer from "./Footer";
+import {
+  FiHome, FiGrid, FiFileText, FiMonitor, FiAward, FiBell,
+  FiUser, FiSettings, FiLogOut, FiSearch, FiChevronDown, FiChevronRight,
+  FiGift, FiCalendar, FiZap, FiTarget, FiAlertCircle, FiX
+} from "react-icons/fi";
+import { MdOutlinePsychology } from "react-icons/md";
 
 export default function Home() {
   const {
@@ -278,13 +284,13 @@ export default function Home() {
 
   const [searchQuery, setSearchQuery] = useState("");
 
-  // ── 10 COMPREHENSIVE SUBJECT AREAS ──
+  // 10 Subject area track definitions
   const SUBJECT_AREAS = [
     {
       id: 'fe',
       title: 'Frontend Engineering',
       subtitle: 'HTML5, Modern CSS, JavaScript (ES6+) & React.js',
-      icon: '▭',
+      icon: 'FE',
       headerGrad: 'linear-gradient(135deg, #0f3d38, #0d766b, #0f9689)',
       borderCol: '#99f6e4',
       subBg: 'linear-gradient(135deg, #f0fdfa, #ecfdf5)',
@@ -296,7 +302,7 @@ export default function Home() {
       id: 'be',
       title: 'Backend Engineering',
       subtitle: 'Node.js, Express REST APIs, SQL Databases & System Design',
-      icon: '◈',
+      icon: 'BE',
       headerGrad: 'linear-gradient(135deg, #431407, #9a3412, #c2410c)',
       borderCol: '#fed7aa',
       subBg: 'linear-gradient(135deg, #fff7ed, #fffbeb)',
@@ -308,7 +314,7 @@ export default function Home() {
       id: 'core',
       title: 'Core Computer Science',
       subtitle: 'Operating Systems (OS), DBMS Internals, Networks (CN) & OOP',
-      icon: '⚙️',
+      icon: 'CS',
       headerGrad: 'linear-gradient(135deg, #1e293b, #334155, #475569)',
       borderCol: '#cbd5e1',
       subBg: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
@@ -320,7 +326,7 @@ export default function Home() {
       id: 'devops',
       title: 'DevOps & Cloud Engineering',
       subtitle: 'Docker, Kubernetes (K8s), CI/CD Automation & Linux Systems',
-      icon: '🚀',
+      icon: 'OPS',
       headerGrad: 'linear-gradient(135deg, #064e3b, #047857, #10b981)',
       borderCol: '#a7f3d0',
       subBg: 'linear-gradient(135deg, #ecfdf5, #f0fdf4)',
@@ -332,7 +338,7 @@ export default function Home() {
       id: 'ai',
       title: 'Artificial Intelligence (AI)',
       subtitle: 'AI Foundations, Search Algorithms, Generative AI, LLMs & NLP',
-      icon: '🤖',
+      icon: 'AI',
       headerGrad: 'linear-gradient(135deg, #3b0764, #581c87, #7e22ce)',
       borderCol: '#d8b4fe',
       subBg: 'linear-gradient(135deg, #faf5ff, #f3e8ff)',
@@ -344,7 +350,7 @@ export default function Home() {
       id: 'ml',
       title: 'Machine Learning (ML)',
       subtitle: 'Supervised/Unsupervised Learning, Evaluation Metrics & Features',
-      icon: '🧠',
+      icon: 'ML',
       headerGrad: 'linear-gradient(135deg, #1e3a8a, #1d4ed8, #2563eb)',
       borderCol: '#bfdbfe',
       subBg: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
@@ -356,7 +362,7 @@ export default function Home() {
       id: 'dl',
       title: 'Deep Learning (DL)',
       subtitle: 'Artificial Neural Networks, Backprop, CNNs & Transformers',
-      icon: '⚡',
+      icon: 'DL',
       headerGrad: 'linear-gradient(135deg, #701a75, #a21caf, #c026d3)',
       borderCol: '#f5d0fe',
       subBg: 'linear-gradient(135deg, #fdf4ff, #fae8ff)',
@@ -368,7 +374,7 @@ export default function Home() {
       id: 'ds',
       title: 'Data Science & Analytics',
       subtitle: 'NumPy Vectorization, Pandas DataFrames, Statistics & EDA',
-      icon: '📊',
+      icon: 'DS',
       headerGrad: 'linear-gradient(135deg, #134e4a, #0f766e, #14b8a6)',
       borderCol: '#99f6e4',
       subBg: 'linear-gradient(135deg, #f0fdfa, #ccfbf1)',
@@ -380,7 +386,7 @@ export default function Home() {
       id: 'security',
       title: 'Cyber Security & Threat Defense',
       subtitle: 'OWASP Web Security, Cryptography, Firewalls & Network Defense',
-      icon: '🛡️',
+      icon: 'SEC',
       headerGrad: 'linear-gradient(135deg, #7f1d1d, #b91c1c, #dc2626)',
       borderCol: '#fecaca',
       subBg: 'linear-gradient(135deg, #fef2f2, #fee2e2)',
@@ -392,7 +398,7 @@ export default function Home() {
       id: 'prog',
       title: 'Programming Foundations & DSA',
       subtitle: 'Data Structures & Algorithms (DSA), Java, Python, C & C++',
-      icon: '🖋',
+      icon: 'DSA',
       headerGrad: 'linear-gradient(135deg, #1e1b4b, #312e81, #4338ca)',
       borderCol: '#c7d2fe',
       subBg: 'linear-gradient(135deg, #eef2ff, #f5f3ff)',
@@ -437,7 +443,7 @@ export default function Home() {
     if (window.confirm("Reset all progress?")) resetProgress();
   };
 
-  /* ── CATEGORY CARD ── */
+  /* Category card renders quiz progress and CTA */
   const CategoryCard = ({ category }) => {
     const cp = getCategoryProgress(category.slug);
     const done = cp?.passed?.length || 0;
@@ -494,7 +500,7 @@ export default function Home() {
     );
   };
 
-  /* ── GROUP BLOCK ── */
+  /* Expandable group container for a subject area track */
   const GroupBlock = ({ title, subtitle, headerGrad, borderCol, subBg, subBorder, expanded, setExpanded, stats, cats }) => (
     <div className="hd-group" style={{ borderColor: borderCol }}>
       <div
@@ -510,7 +516,7 @@ export default function Home() {
         </div>
         <div className="hd-group-right">
           <span className="hd-group-pct">{stats.pct}%</span>
-          <span className="hd-expand-btn">{expanded ? '▲' : '▼'}</span>
+          <span className="hd-expand-btn">{expanded ? <FiChevronDown size={15}/> : <FiChevronRight size={15}/>}</span>
         </div>
       </div>
       {expanded && (
@@ -523,19 +529,19 @@ export default function Home() {
     </div>
   );
 
-  /* ── SIDEBAR CONTENT ── */
+  /* Sidebar nav shared between desktop and mobile drawer */
   const SidebarContent = () => (
     <>
       <nav className="hd-sb-nav">
         <button
           className={`hd-nav-item ${activeNav === 'dashboard' ? 'active' : ''}`}
           onClick={() => { setActiveNav('dashboard'); closeSidebar(); }}
-        >⌂ Dashboard</button>
+        ><FiHome size={15} /> Dashboard</button>
         
         <button
           className={`hd-nav-item ${activeNav === 'all' ? 'active' : ''}`}
           onClick={() => { setActiveNav('all'); closeSidebar(); }}
-        >🗂 All Categories</button>
+        ><FiGrid size={15} /> All Categories</button>
 
         <button
           type="button"
@@ -547,9 +553,9 @@ export default function Home() {
               subtitle: 'Sign in or create an account to launch your AI-proctored technical interview.'
             });
           }}
-          style={{ color: '#059669', fontWeight: 600, background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+          style={{ color: '#059669', fontWeight: 600, background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
         >
-          🤖 Start Technical Interview
+          <FiMonitor size={15} /> Start Technical Interview
         </button>
 
         <button
@@ -562,9 +568,9 @@ export default function Home() {
               subtitle: 'Sign in or create an account to start your resume interview.'
             });
           }}
-          style={{ color: '#2563eb', fontWeight: 600, background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+          style={{ color: '#2563eb', fontWeight: 600, background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
         >
-          📄 Start Resume-Based Interview
+          <FiFileText size={15} /> Start Resume-Based Interview
         </button>
         
         <div className="hd-nav-label">Subject Areas (10 Tracks)</div>
@@ -583,8 +589,8 @@ export default function Home() {
                   setGroupExpanded(prev => ({ ...prev, [area.id]: true }));
                 }}
               >
-                <span className="acc-title">{area.icon} {area.title}</span>
-                <span className="acc-arrow">{isOpen ? '▼' : '▶'}</span>
+                <span className="acc-title">{area.title}</span>
+                <span className="acc-arrow">{isOpen ? <FiChevronDown size={13}/> : <FiChevronRight size={13}/>}</span>
               </button>
               <div className={`hd-accordion-body ${isOpen ? 'open' : ''}`}>
                 <div className="hd-accordion-inner">
@@ -640,7 +646,7 @@ export default function Home() {
     </>
   );
 
-  /* ── MAIN RENDER ── */
+
   return (
     <div className="hd-layout">
       {/* Top Navbar */}
@@ -650,14 +656,14 @@ export default function Home() {
             <span /><span /><span />
           </button>
           <div className="hd-logo-nav">
-            <span className="hd-logo-icon">🎓</span>
+            <FiAward className="hd-logo-icon" size={22} color="#60a5fa" />
             <span className="hd-logo-text-nav">MockInterviewHub</span>
           </div>
         </div>
         
         <div className="hd-nav-center">
           <div className="hd-search-bar">
-            <span className="search-icon">🔍</span>
+            <FiSearch className="search-icon" size={16} />
             <input 
               type="text" 
               placeholder="Search courses, quizzes..." 
@@ -679,7 +685,7 @@ export default function Home() {
               });
             }}
           >
-            📄
+            <FiFileText size={17} />
           </button>
           <button
             type="button"
@@ -692,9 +698,9 @@ export default function Home() {
               });
             }}
           >
-            🤖
+            <FiMonitor size={17} />
           </button>
-          <Link to="/leaderboard" className="hd-icon-btn" title="Leaderboard">🏆</Link>
+          <Link to="/leaderboard" className="hd-icon-btn" title="Leaderboard"><FiAward size={17} /></Link>
 
           {/* Rewards Help Icon Button & Popover */}
           <div className="hd-popover-wrap" ref={rewardsHelpRef}>
@@ -716,7 +722,7 @@ export default function Home() {
               <div className="hd-popover-card hd-rewards-popover" role="dialog" aria-label="Coin Rules Help">
                 <div className="hd-popover-header">
                   <div className="hd-popover-title-row">
-                    <span className="hd-popover-icon">🪙</span>
+                    <span className="hd-popover-icon"><FiGift size={18} color="#f59e0b" /></span>
                     <div>
                       <h4>Coin Rewards & Rules</h4>
                       <p>How to earn coins across MockInterviewHub</p>
@@ -727,13 +733,13 @@ export default function Home() {
                     onClick={() => setRewardsHelpOpen(false)}
                     aria-label="Close rules popover"
                   >
-                    ✕
+                    <FiX />
                   </button>
                 </div>
 
                 <div className="hd-rules-list">
                   <div className="hd-rule-item">
-                    <div className="hd-rule-icon">📅</div>
+                    <div className="hd-rule-icon"><FiCalendar size={16} /></div>
                     <div className="hd-rule-content">
                       <div className="hd-rule-title-row">
                         <strong>Daily Login</strong>
@@ -744,7 +750,7 @@ export default function Home() {
                   </div>
 
                   <div className="hd-rule-item">
-                    <div className="hd-rule-icon">🎯</div>
+                    <div className="hd-rule-icon"><FiTarget size={16} /></div>
                     <div className="hd-rule-content">
                       <div className="hd-rule-title-row">
                         <strong>Correct Quiz Answer</strong>
@@ -755,7 +761,7 @@ export default function Home() {
                   </div>
 
                   <div className="hd-rule-item">
-                    <div className="hd-rule-icon">🔥</div>
+                    <div className="hd-rule-icon"><FiZap size={16} /></div>
                     <div className="hd-rule-content">
                       <div className="hd-rule-title-row">
                         <strong>7-Day Login Streak</strong>
@@ -766,7 +772,7 @@ export default function Home() {
                   </div>
 
                   <div className="hd-rule-item">
-                    <div className="hd-rule-icon">🤖</div>
+                    <div className="hd-rule-icon"><FiMonitor size={16} /></div>
                     <div className="hd-rule-content">
                       <div className="hd-rule-title-row">
                         <strong>Technical Mock Interview</strong>
@@ -780,7 +786,7 @@ export default function Home() {
                   </div>
 
                   <div className="hd-rule-item">
-                    <div className="hd-rule-icon">📄</div>
+                    <div className="hd-rule-icon"><FiFileText size={16} /></div>
                     <div className="hd-rule-content">
                       <div className="hd-rule-title-row">
                         <strong>Resume-Based Interview</strong>
@@ -814,7 +820,7 @@ export default function Home() {
               aria-label="Notifications"
               aria-expanded={notificationsOpen}
             >
-              🔔
+              <FiBell size={17} />
               {coinHistory.length > 0 && (
                 <span className="hd-badge-dot" />
               )}
@@ -824,7 +830,7 @@ export default function Home() {
               <div className="hd-popover-card hd-notifications-popover" role="dialog" aria-label="Notifications Panel">
                 <div className="hd-popover-header">
                   <div className="hd-popover-title-row">
-                    <span className="hd-popover-icon">🔔</span>
+                    <span className="hd-popover-icon"><FiBell size={18} color="#3b82f6" /></span>
                     <div>
                       <h4>Notifications</h4>
                       <p>Coin reward transactions & milestones</p>
@@ -835,19 +841,19 @@ export default function Home() {
                     onClick={() => setNotificationsOpen(false)}
                     aria-label="Close notifications popover"
                   >
-                    ✕
+                    <FiX />
                   </button>
                 </div>
 
                 <div className="hd-notifications-list">
                   {coinHistory.length > 0 ? (
                     coinHistory.map((item) => {
-                      let icon = "🪙";
-                      if (item.source === "DAILY_LOGIN") icon = "📅";
-                      else if (item.source === "SEVEN_DAY_STREAK") icon = "🔥";
-                      else if (item.source === "ANSWER_CORRECTLY") icon = "🎯";
+                      let icon = <FiGift size={15} />;
+                      if (item.source === "DAILY_LOGIN") icon = <FiCalendar size={15} />;
+                      else if (item.source === "SEVEN_DAY_STREAK") icon = <FiZap size={15} />;
+                      else if (item.source === "ANSWER_CORRECTLY") icon = <FiTarget size={15} />;
                       else if (item.source === "INTERVIEW_SCORE") {
-                        icon = item.activity?.toLowerCase().includes("resume") ? "📄" : "🤖";
+                        icon = item.activity?.toLowerCase().includes("resume") ? <FiFileText size={15} /> : <FiMonitor size={15} />;
                       }
 
                       return (
@@ -865,7 +871,7 @@ export default function Home() {
                     })
                   ) : (
                     <div className="hd-notif-empty">
-                      <div className="hd-empty-bell">🔔</div>
+                      <div className="hd-empty-bell"><FiBell size={32} color="#cbd5e1" /></div>
                       <h5>No notifications yet</h5>
                       <p>Complete daily logins, quizzes, and interviews to earn coins and track rewards here!</p>
                     </div>
@@ -907,10 +913,10 @@ export default function Home() {
                     <span>{XP} XP</span>
                   </div>
                   <hr />
-                  <button onClick={openProfileDetails}>👤 My Profile</button>
-                  <button onClick={openProfileSettings}>⚙️ Settings</button>
+                  <button onClick={openProfileDetails} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><FiUser size={14} /> My Profile</button>
+                  <button onClick={openProfileSettings} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><FiSettings size={14} /> Settings</button>
                   <hr />
-                  <button onClick={() => { logoutUser(); setDropdownOpen(false); }} className="logout-text">↪ Log Out</button>
+                  <button onClick={() => { logoutUser(); setDropdownOpen(false); }} className="logout-text" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><FiLogOut size={14} /> Log Out</button>
                 </div>
               )}
             </div>
@@ -926,7 +932,7 @@ export default function Home() {
                   });
                 }}
               >
-                <span className="hd-profile-nav-icon">👤</span>
+                <FiUser className="hd-profile-nav-icon" size={16} />
                 <span className="hd-profile-nav-text">Profile</span>
               </button>
               <button
@@ -1053,7 +1059,7 @@ export default function Home() {
             />
           ) : (
             <div className="guest-profile-gate-card">
-              <div className="gate-icon">👤</div>
+              <div className="gate-icon"><FiUser size={40} color="#94a3b8" /></div>
               <h2>Authentication Required</h2>
               <p>Sign in or create an account to view your career readiness score, performance history, and customized improvement plan.</p>
               <div className="gate-actions">
@@ -1081,14 +1087,13 @@ export default function Home() {
                 {/* Category groups for 10 Subject Areas */}
         {activeNav !== 'dashboard' && activeNav !== 'profile' && (
           <section className="hd-categories">
-            {/* Subject Area Pill Filters */}
             <div className="hd-subject-filter-bar">
               <button
                 type="button"
                 className={`hd-filter-pill ${activeNav === 'all' ? 'active' : ''}`}
                 onClick={() => setActiveNav('all')}
               >
-                🌐 All Tracks (10)
+                All Tracks (10)
               </button>
               {SUBJECT_AREAS.map(area => {
                 const count = getAreaCategories(area).length;
@@ -1099,7 +1104,7 @@ export default function Home() {
                     className={`hd-filter-pill ${activeNav === area.id ? 'active' : ''}`}
                     onClick={() => setActiveNav(area.id)}
                   >
-                    <span>{area.icon}</span> {area.title.split(' ')[0]}
+                    <span className="hd-filter-pill-badge">{area.icon}</span> {area.title.split(' ')[0]}
                     <span className="hd-filter-pill-count">{count}</span>
                   </button>
                 );
@@ -1142,7 +1147,7 @@ export default function Home() {
               if (renderedBlocks.length === 0) {
                 return (
                   <div className="hd-empty-search-state">
-                    <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🔍</div>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '12px', color: '#94a3b8' }}><FiSearch /></div>
                     <h3 style={{ fontSize: '1.2rem', color: '#1e293b', marginBottom: '8px' }}>
                       No quizzes found {searchQuery ? `matching "${searchQuery}"` : 'in this track'}
                     </h3>
@@ -1186,7 +1191,7 @@ export default function Home() {
           <div className="instructions-modal" onClick={e => e.stopPropagation()} style={{maxWidth: '600px'}}>
             <div className="modal-header">
               <h2>Edit Profile Settings</h2>
-              <button className="close-button" onClick={() => setIsSettingsModalOpen(false)}>✕</button>
+              <button className="close-button" onClick={() => setIsSettingsModalOpen(false)}><FiX /></button>
             </div>
             <div className="card-body" style={{padding: '24px', display: 'block'}}>
               <form className="profile-edit-form" onSubmit={handleProfileUpdate}>
@@ -1224,7 +1229,7 @@ export default function Home() {
                             </div>
 
                             <div className="password-section-divider">
-                              <h4>🔐 Change Password <span className="text-muted">(Optional)</span></h4>
+                              <h4>Change Password <span className="text-muted">(Optional)</span></h4>
                             </div>
 
                             <div className="form-group">

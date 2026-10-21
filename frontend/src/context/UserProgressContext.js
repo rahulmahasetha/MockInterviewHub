@@ -175,7 +175,7 @@ export function UserProgressProvider({ children }) {
       };
 
       setProgress(finalProgress);
-      toast.success(`Account created successfully! Welcome, ${username}! 🎉`);
+      toast.success(`Account created successfully! Welcome, ${username}!`);
       return { success: true };
     } catch (error) {
       console.error('Sign up error:', error);
@@ -413,7 +413,7 @@ export function UserProgressProvider({ children }) {
 
     toast.success(`+${loginRewardCoins} coins: Daily Login`);
     if (isSevenDayStreak) {
-      toast.success(`🔥 +${streakBonusCoins} coins: 7-Day Streak Milestone!`);
+      toast.success(`+${streakBonusCoins} coins: 7-Day Streak Milestone!`);
     }
 
     return true;
