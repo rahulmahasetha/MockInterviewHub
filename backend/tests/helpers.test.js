@@ -5,7 +5,7 @@ const {
   buildFallbackQuestions,
 } = require('../utils/helpers');
 
-// ─── escapeRegExp ────────────────────────────────────────────────────────────
+// 
 
 describe('escapeRegExp', () => {
   test('escapes regex special characters', () => {
@@ -41,7 +41,7 @@ describe('escapeRegExp', () => {
   });
 });
 
-// ─── dedupeLeaderboardRows ────────────────────────────────────────────────────
+// 
 
 describe('dedupeLeaderboardRows', () => {
   test('deduplicates rows with the same name/type/topic, keeping highest score', () => {
@@ -110,7 +110,7 @@ describe('dedupeLeaderboardRows', () => {
   });
 });
 
-// ─── formatScoreTimestamp ─────────────────────────────────────────────────────
+// 
 
 describe('formatScoreTimestamp', () => {
   test('returns a non-empty string', () => {
@@ -126,7 +126,7 @@ describe('formatScoreTimestamp', () => {
   });
 });
 
-// ─── buildFallbackQuestions ───────────────────────────────────────────────────
+// 
 
 describe('buildFallbackQuestions', () => {
   test('returns one question per category by default', () => {

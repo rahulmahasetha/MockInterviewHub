@@ -36,7 +36,7 @@ const app = express();
 app.use(express.json());
 app.use('/leaderboard', leaderboardRoutes);
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 
 
 describe('Leaderboard Routes', () => {
   beforeEach(() => {
@@ -46,7 +46,7 @@ describe('Leaderboard Routes', () => {
     fallbackStore.progress = [];
   });
 
-  // ── GET /leaderboard ───────────────────────────────────────────────────────
+  // 
 
   describe('GET /leaderboard', () => {
     test('returns an empty array when there are no entries', async () => {
@@ -70,7 +70,7 @@ describe('Leaderboard Routes', () => {
     });
   });
 
-  // ── POST /leaderboard ──────────────────────────────────────────────────────
+  // 
 
   describe('POST /leaderboard', () => {
     test('returns 400 when name is missing', async () => {
@@ -138,7 +138,7 @@ describe('Leaderboard Routes', () => {
     });
   });
 
-  // ── PUT /leaderboard/:id ───────────────────────────────────────────────────
+  // 
 
   describe('PUT /leaderboard/:id', () => {
     test('returns 404 for a non-existent entry id', async () => {

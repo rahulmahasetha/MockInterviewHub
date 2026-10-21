@@ -13,7 +13,7 @@ const buildMocks = (authHeader) => {
 };
 
 describe('verifyToken middleware', () => {
-  // ── Missing / malformed header ──────────────────────────────────────────
+  // 
 
   test('responds 401 when Authorization header is absent', () => {
     const { req, res, next } = buildMocks(undefined);
@@ -42,7 +42,7 @@ describe('verifyToken middleware', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  // ── Expired token ───────────────────────────────────────────────────────
+  // 
 
   test('responds 401 for an expired JWT', () => {
     const expiredToken = jwt.sign(
@@ -56,7 +56,7 @@ describe('verifyToken middleware', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  // ── Valid token ─────────────────────────────────────────────────────────
+  // 
 
   test('calls next() and attaches decoded payload to req.user for a valid JWT', () => {
     const payload = { userId: 'user_123' };
@@ -82,7 +82,7 @@ describe('verifyToken middleware', () => {
     expect(req.user.role).toBe('admin');
   });
 
-  // ── Wrong secret ────────────────────────────────────────────────────────
+  // 
 
   test('responds 401 when token is signed with a different secret', () => {
     const token = jwt.sign({ userId: 'u_1' }, 'wrong_secret', { expiresIn: '1h' });

@@ -32,19 +32,18 @@ const app = express();
 app.use(express.json());
 app.use('/quiz-categories', quizRoutes);
 
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Quiz Category Route Tests
 describe('Quiz Category Routes', () => {
   beforeEach(() => {
     // Reset the mutable categories array before each test
     mockCategories.length = 0;
     mockCategories.push(
-      { slug: 'math', name: 'Math', label: '➕', iconColor: '#2563eb', questions: [] },
-      { slug: 'science', name: 'Science', label: '🔬', iconColor: '#0f766e', questions: [] }
+      { slug: 'math', name: 'Math', label: 'MATH', iconColor: '#2563eb', questions: [] },
+      { slug: 'science', name: 'Science', label: 'SCI', iconColor: '#0f766e', questions: [] }
     );
   });
 
-  // ── GET /quiz-categories ───────────────────────────────────────────────────
+  // GET /quiz-categories
 
   describe('GET /quiz-categories', () => {
     test('returns an array of categories', async () => {
@@ -63,7 +62,7 @@ describe('Quiz Category Routes', () => {
     });
   });
 
-  // ── GET /quiz-categories/:slug ─────────────────────────────────────────────
+  // GET /quiz-categories/:slug
 
   describe('GET /quiz-categories/:slug', () => {
     test('returns a category when slug exists', async () => {
@@ -80,11 +79,10 @@ describe('Quiz Category Routes', () => {
     });
   });
 
-  // ── POST /quiz-categories ──────────────────────────────────────────────────
-
+  // POST /quiz-categories
   describe('POST /quiz-categories', () => {
     test('creates a new category and returns 201', async () => {
-      const newCat = { slug: 'history', name: 'History', label: '📜', iconColor: '#7c3aed', questions: [] };
+      const newCat = { slug: 'history', name: 'History', label: 'HIST', iconColor: '#7c3aed', questions: [] };
       const res = await request(app).post('/quiz-categories').send(newCat);
       expect(res.status).toBe(201);
       expect(res.body.slug).toBe('history');
@@ -101,7 +99,7 @@ describe('Quiz Category Routes', () => {
     });
   });
 
-  // ── PUT /quiz-categories/:slug ─────────────────────────────────────────────
+  // PUT /quiz-categories/:slug
 
   describe('PUT /quiz-categories/:slug', () => {
     test('updates an existing category and returns the updated document', async () => {
@@ -120,7 +118,7 @@ describe('Quiz Category Routes', () => {
     });
   });
 
-  // ── DELETE /quiz-categories/:slug ──────────────────────────────────────────
+  // DELETE /quiz-categories/:slug
 
   describe('DELETE /quiz-categories/:slug', () => {
     test('deletes an existing category and returns success', async () => {

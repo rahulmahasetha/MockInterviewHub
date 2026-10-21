@@ -30,7 +30,7 @@ const {
   prefersXAI,
 } = require('../utils/ai');
 
-// ─── cleanAIJsonText ──────────────────────────────────────────────────────────
+// 
 
 describe('cleanAIJsonText', () => {
   test('strips markdown JSON fence and extracts object', () => {
@@ -79,7 +79,7 @@ describe('cleanAIJsonText', () => {
   });
 });
 
-// ─── parseAiJsonSafely ────────────────────────────────────────────────────────
+// 
 
 describe('parseAiJsonSafely', () => {
   const fallback = { default: true };
@@ -116,7 +116,7 @@ describe('parseAiJsonSafely', () => {
   });
 });
 
-// ─── API key helper flags ─────────────────────────────────────────────────────
+// 
 
 describe('API key environment helpers', () => {
   const originalEnv = process.env;

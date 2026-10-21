@@ -5,7 +5,7 @@
  * The fallback (file-based) DB is also mocked — all persistence is in-memory.
  */
 
-// ── Mock db layer before any module imports ──────────────────────────────────
+// 
 
 jest.mock('../config/db', () => ({
   connectDB: jest.fn(),
@@ -33,7 +33,7 @@ jest.mock('../utils/seeder', () => ({
   cleanupDuplicateLeaderboardEntries: jest.fn(),
 }));
 
-// ── Now build the Express app ─────────────────────────────────────────────────
+// 
 
 const express = require('express');
 const request = require('supertest');
@@ -43,7 +43,7 @@ const app = express();
 app.use(express.json());
 app.use('/auth', authRoutes);
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 
 
 describe('Auth Routes', () => {
   beforeEach(() => {
@@ -52,7 +52,7 @@ describe('Auth Routes', () => {
     fallbackStore.progress = [];
   });
 
-  // ── POST /auth/signup ──────────────────────────────────────────────────────
+  // 
 
   describe('POST /auth/signup', () => {
     test('returns 400 when required fields are missing', async () => {
@@ -92,7 +92,7 @@ describe('Auth Routes', () => {
     });
   });
 
-  // ── POST /auth/login ───────────────────────────────────────────────────────
+  // 
 
   describe('POST /auth/login', () => {
     beforeEach(async () => {
@@ -135,7 +135,7 @@ describe('Auth Routes', () => {
     });
   });
 
-  // ── POST /auth/forgot-password ─────────────────────────────────────────────
+  // 
 
   describe('POST /auth/forgot-password', () => {
     test('returns 400 when required fields are missing', async () => {
