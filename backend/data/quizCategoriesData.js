@@ -21,9 +21,7 @@ const buildLevels = (questions) => {
 };
 
 const QUIZ_CATEGORIES = [
-  /* ─────────────────────────────────────────────────────────────
-     1. FRONTEND ENGINEERING (frontend)
-  ───────────────────────────────────────────────────────────── */
+  // 1. Frontend Engineering track (HTML5, CSS3, JavaScript ES6+, React)
   {
     slug: 'html',
     name: 'HTML5 & Web Standards Quiz',
@@ -109,9 +107,7 @@ const QUIZ_CATEGORIES = [
     ])
   },
 
-  /* ─────────────────────────────────────────────────────────────
-     2. BACKEND ENGINEERING (backend)
-  ───────────────────────────────────────────────────────────── */
+  // 2. Backend Engineering track (Node.js, Express, databases, microservices)
   {
     slug: 'nodejs',
     name: 'Node.js Runtime & Async I/O Quiz',
@@ -197,9 +193,7 @@ const QUIZ_CATEGORIES = [
     ])
   },
 
-  /* ─────────────────────────────────────────────────────────────
-     3. CORE SUBJECTS (core)
-  ───────────────────────────────────────────────────────────── */
+  // 3. Core Subjects track (Operating Systems, Networking, DBMS)
   {
     slug: 'core-os',
     name: 'Operating Systems (OS) Concepts Quiz',
@@ -285,9 +279,7 @@ const QUIZ_CATEGORIES = [
     ])
   },
 
-  /* ─────────────────────────────────────────────────────────────
-     4. DEVOPS & CLOUD (devops)
-  ───────────────────────────────────────────────────────────── */
+  // 4. DevOps & Cloud track (Docker, Kubernetes, CI/CD, AWS)
   {
     slug: 'devops-docker',
     name: 'Docker & Containerization Mastery Quiz',
@@ -373,9 +365,7 @@ const QUIZ_CATEGORIES = [
     ])
   },
 
-  /* ─────────────────────────────────────────────────────────────
-     5. ARTIFICIAL INTELLIGENCE (ai)
-  ───────────────────────────────────────────────────────────── */
+  // 5. Artificial Intelligence track (Search, Knowledge Graphs, NLP)
   {
     slug: 'ai-foundations',
     name: 'AI Foundations & Search Algorithms Quiz',
@@ -440,9 +430,7 @@ const QUIZ_CATEGORIES = [
     ])
   },
 
-  /* ─────────────────────────────────────────────────────────────
-     6. MACHINE LEARNING (ml)
-  ───────────────────────────────────────────────────────────── */
+  // 6. Machine Learning track (Supervised/Unsupervised, Model Evaluation)
   {
     slug: 'ml-algorithms',
     name: 'Supervised & Unsupervised ML Algorithms Quiz',
@@ -507,9 +495,7 @@ const QUIZ_CATEGORIES = [
     ])
   },
 
-  /* ─────────────────────────────────────────────────────────────
-     7. DEEP LEARNING (dl)
-  ───────────────────────────────────────────────────────────── */
+  // 7. Deep Learning track (Neural Networks, CNNs, RNNs, Transformers)
   {
     slug: 'dl-neural-nets',
     name: 'Neural Networks & Backpropagation Quiz',
@@ -574,9 +560,7 @@ const QUIZ_CATEGORIES = [
     ])
   },
 
-  /* ─────────────────────────────────────────────────────────────
-     8. DATA SCIENCE (datascience)
-  ───────────────────────────────────────────────────────────── */
+  // 8. Data Science track (Pandas, Statistical Inference, Exploration)
   {
     slug: 'ds-python',
     name: 'Python for Data Science (NumPy & Pandas) Quiz',
@@ -641,9 +625,7 @@ const QUIZ_CATEGORIES = [
     ])
   },
 
-  /* ─────────────────────────────────────────────────────────────
-     9. CYBER SECURITY (security)
-  ───────────────────────────────────────────────────────────── */
+  // 9. Cyber Security track (Network Security, Cryptography, OWASP)
   {
     slug: 'sec-web',
     name: 'Web Security & OWASP Top 10 Quiz',
@@ -708,9 +690,7 @@ const QUIZ_CATEGORIES = [
     ])
   },
 
-  /* ─────────────────────────────────────────────────────────────
-     10. PROGRAMMING FOUNDATIONS & DSA (programming)
-  ───────────────────────────────────────────────────────────── */
+  // 10. Programming Foundations & DSA track (Trees, Graphs, Sorting, DP)
   {
     slug: 'dsa',
     name: 'Data Structures & Algorithms (DSA) Quiz',

@@ -4,14 +4,14 @@ const { seedDefaultData, seedQuizData, seedResumeSections, cleanupDuplicateLeade
 let isMongoDBConnected = false;
 
 const connectDB = async (MONGODB_URI) => {
-  console.log('🔌 Connecting to MongoDB...');
+  console.log('Connecting to MongoDB...');
   try {
     await mongoose.connect(MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
       serverSelectionTimeoutMS: 5000 // 5 seconds timeout
     });
-    console.log('✅ Connected to MongoDB database successfully at ' + MONGODB_URI);
+    console.log('Connected to MongoDB database successfully at ' + MONGODB_URI);
     isMongoDBConnected = true;
 
     // Drop stale indexes that don't match current schema
@@ -20,9 +20,9 @@ const connectDB = async (MONGODB_URI) => {
       const indexes = await usersCollection.indexes();
       for (const idx of indexes) {
         if (idx.key && idx.key.email !== undefined) {
-          console.log('🧹 Dropping stale email index from users collection...');
+          console.log('Dropping stale email index from users collection...');
           await usersCollection.dropIndex(idx.name);
-          console.log('✅ Stale email index removed successfully.');
+          console.log('Stale email index removed successfully.');
         }
       }
     } catch (e) {
@@ -36,11 +36,10 @@ const connectDB = async (MONGODB_URI) => {
     await seedResumeSections();
     await cleanupDuplicateLeaderboardEntries();
   } catch (err) {
-    console.log('\n⚠️  MongoDB Connection Failed!');
+    console.log('\nMongoDB Connection Notice:');
     console.log(`Could not connect to database at ${MONGODB_URI}.`);
-    console.log('💡 INSTRUCTIONS: Please ensure MongoDB is installed and running on your system.');
-    console.log('💡 Alternatively, specify a custom connection string in the MONGODB_URI environment variable.');
-    console.log('🛡️  RESILIENT MODE: Falling back to local file-based database (db_fallback.json).\n');
+    console.log('Ensure MongoDB is running or specify a connection string via MONGODB_URI.');
+    console.log('Resilient Mode Active: Running with local file database (db_fallback.json).\n');
     isMongoDBConnected = false;
   }
 };

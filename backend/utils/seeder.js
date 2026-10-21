@@ -36,10 +36,10 @@ async function seedDefaultData() {
   try {
     const count = await Leaderboard.countDocuments();
     if (count === 0) {
-      console.log('🌱 Seeding initial leaderboard entries to MongoDB...');
+      console.log('Seeding initial leaderboard entries to MongoDB...');
       const fallback = readFallbackData();
       await Leaderboard.insertMany(fallback.leaderboard);
-      console.log('✅ Seeding complete!');
+      console.log('Leaderboard seeding complete.');
     }
   } catch (err) {
     console.error('Error seeding data:', err);
@@ -65,13 +65,13 @@ async function seedResumeSections() {
   try {
     const count = await ResumeSection.countDocuments();
     if (count === 0) {
-      console.log('🌱 Seeding default resume sections to MongoDB...');
+      console.log('Seeding default resume sections to MongoDB...');
       const sectionsToInsert = DEFAULT_RESUME_SECTIONS.map((sec, index) => ({
         ...sec,
         displayOrder: index
       }));
       await ResumeSection.insertMany(sectionsToInsert);
-      console.log(`✅ Seeded ${sectionsToInsert.length} resume sections!`);
+      console.log(`Seeded ${sectionsToInsert.length} resume sections.`);
     }
   } catch (err) {
     console.error('Error seeding resume sections:', err);
