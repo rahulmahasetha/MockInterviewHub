@@ -84,50 +84,81 @@ The platform includes 10 subject area tracks, each featuring interactive 10-leve
 
 ---
 
-## System Architecture
 
 ## System Architecture
 
 The platform consists of three primary layers:
 
-1. **Browser Client (React SPA)**
-   - Renders UI, handles routing, and interacts with the backend via a RESTful JSON API.
-   - Utilizes Web Speech API for voice interaction and enforces fullscreen/focus for proctoring.
+### 1. Browser Client (React SPA)
+- Renders the user interface and handles client-side routing.
+- Communicates with the backend through a RESTful JSON API.
+- Uses the Web Speech API for voice interactions.
+- Supports fullscreen and focus controls for proctoring.
 
-2. **Express.js Backend API**
-   - Exposes authentication, quiz, interview, and resume endpoints.
-   - Includes JWT middleware, PDF parsing, proctoring event logging, and health probe.
+### 2. Express.js Backend API
+- Provides authentication, quiz, interview, and resume endpoints.
+- Uses JWT middleware for authentication.
+- Processes resume PDFs and logs proctoring events.
+- Provides health checks and diagnostic endpoints.
 
-3. **Persistence & AI Engine**
-   - **Persistence:** MongoDB Atlas accessed through Mongoose; a local JSON store (`db_fallback.json`) provides automatic fallback.
-   - **AI Engine:** Primary Google Gemini SDK with Groq (Llama 3) as a secondary fallback.
+### 3. Persistence and AI Engine
+- **Database:** MongoDB Atlas with Mongoose.
+- **Fallback Storage:** Local JSON store (`db_fallback.json`).
+- **Primary AI Provider:** Google Gemini SDK.
+- **Fallback AI Provider:** Groq Cloud SDK using Llama models.
+
+## Architecture Diagram
 
 ```mermaid
-flowchart LR
-    subgraph Client[Browser Client]
-        direction TB
-        UI[React SPA] -->|REST/JSON| API
-        Voice[Web Speech API] --> UI
-        Proctor[Proctoring Guard] --> UI
+flowchart TB
+    subgraph Client["Browser Client"]
+        UI["React SPA"]
+        Voice["Web Speech API"]
+        Proctor["Proctoring Guard"]
+
+        Voice --> UI
+        Proctor --> UI
     end
 
-    subgraph Server[Express.js Backend]
-        direction TB
-        API[REST API] --> Auth[JWT Auth]
-        API --> PDF[PDF Resume Engine]
-        API --> Viol[Proctoring Logger]
-        API --> Health[/Health Probe/Diagnostics/]
+    subgraph Server["Express.js Backend"]
+        API["REST API"]
+        Auth["JWT Authentication"]
+        PDF["PDF Resume Parser"]
+        Logger["Proctoring Event Logger"]
+        Health["Health Checks"]
+
+        API --> Auth
+        API --> PDF
+        API --> Logger
+        API --> Health
     end
 
-    subgraph Persistence[Persistence & AI]
-        direction TB
-        DB[MongoDB Atlas\n(Mongoose ODM)] -->|fallback| JSON[Local JSON Store]
-        AI[Google Gemini SDK] -->|fallback| Groq[Groq Cloud SDK]
+    subgraph Services["Persistence and AI"]
+        DB["MongoDB Atlas"]
+        JSON["Local JSON Store"]
+        Gemini["Google Gemini SDK"]
+        Groq["Groq Cloud SDK"]
+
+        DB -.->|Fallback| JSON
+        Gemini -.->|Fallback| Groq
     end
 
-    UI --> API
+    UI <-->|REST / JSON| API
     API --> DB
-    API --> AI
+    API --> Gemini
+```
+
+## Data Flow
+
+1. The React client sends requests to the Express.js backend through the REST API.
+2. The backend validates requests and applies authentication where required.
+3. Application data is stored in MongoDB through Mongoose.
+4. Resume processing and proctoring events are handled by the backend.
+5. Gemini generates or evaluates interview content, with Groq available as a fallback.
+6. The local JSON store provides an alternative persistence mechanism if the primary database is unavailable.
+
+> **Note:** The fallback flows shown above should match the actual implementation. Verify that database fallback and AI-provider failover are implemented before documenting them as automatic mechanisms.
+
 ```
 
 The diagram illustrates the direction of data flow: the client talks to the Express API, which in turn persists data and invokes the AI engine for interview generation/evaluation.
