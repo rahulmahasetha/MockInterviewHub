@@ -109,9 +109,11 @@ The platform consists of three primary layers:
 
 ## Architecture Diagram
 
+
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph Client["Browser Client"]
+        direction TB
         UI["React SPA"]
         Voice["Web Speech API"]
         Proctor["Proctoring Guard"]
@@ -121,32 +123,35 @@ flowchart TB
     end
 
     subgraph Server["Express.js Backend"]
+        direction TB
         API["REST API"]
         Auth["JWT Authentication"]
-        PDF["PDF Resume Parser"]
-        Logger["Proctoring Event Logger"]
-        Health["Health Checks"]
+        PDF["PDF Resume Engine"]
+        Viol["Proctoring Logger"]
+        Health["Health Probe / Diagnostics"]
 
         API --> Auth
         API --> PDF
-        API --> Logger
+        API --> Viol
         API --> Health
     end
 
-    subgraph Services["Persistence and AI"]
-        DB["MongoDB Atlas"]
+    subgraph Persistence["Persistence and AI"]
+        direction TB
+        DB["MongoDB Atlas<br/>Mongoose ODM"]
         JSON["Local JSON Store"]
-        Gemini["Google Gemini SDK"]
+        AI["Google Gemini SDK"]
         Groq["Groq Cloud SDK"]
 
         DB -.->|Fallback| JSON
-        Gemini -.->|Fallback| Groq
+        AI -.->|Fallback| Groq
     end
 
     UI <-->|REST / JSON| API
     API --> DB
-    API --> Gemini
+    API --> AI
 ```
+
 
 ## Data Flow
 
