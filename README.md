@@ -13,422 +13,484 @@ MockInterviewHub is a modern, production-grade, AI-powered career preparation pl
 
 ## Table of Contents
 
-- [Project Overview](#project-overview)
-- [Key Features](#key-features)
-- [System Architecture](#system-architecture)
-- [Technology Stack](#technology-stack)
-- [Repository Structure](#repository-structure)
-- [Prerequisites](#prerequisites)
-- [Installation and Setup](#installation-and-setup)
+- [The Problem](#the-problem)
+- [What It Does](#what-it-does)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
 - [Environment Variables](#environment-variables)
-- [Running Locally](#running-locally)
+- [Usage](#usage)
 - [API Reference](#api-reference)
-- [Automated Testing & CI/CD](#automated-testing--cicd)
-- [Production Deployment](#production-deployment)
+- [Testing and CI/CD](#testing-and-cicd)
+- [Challenges and Design Decisions](#challenges-and-design-decisions)
+- [Known Limitations](#known-limitations)
+- [Troubleshooting](#troubleshooting)
+- [Deployment](#deployment)
 - [Contributing](#contributing)
 - [License](#license)
 
 ---
 
-## Project Overview
+## The Problem
 
-Securing software engineering and technical roles requires a combination of technical depth, clear verbal communication, structured problem-solving, and an ATS-optimized resume. MockInterviewHub bridges the gap between self-study and actual interview rounds by providing:
+Most interview prep is either generic question lists or paid platforms. Generic lists don't reflect your own projects, so you rehearse answers to questions nobody will ask. Real interviews also include pressure that practising alone lacks: a timer, someone watching, and follow-up questions you didn't plan for.
 
-1. **Conversational AI Mock Interviews:** Candidates practice answering technical and behavioral questions in either voice or written mode, receiving instant multi-dimensional evaluation.
-2. **Resume ATS Scanner & Optimizer:** Candidates upload PDF resumes to extract structured data, evaluate keyword overlap against target job descriptions, identify weak bullet points, and rewrite them using Google's XYZ formula.
-3. **Assessment Proctoring:** Pre-interview hardware checks (camera, microphone, fullscreen) and live violation detection (tab-switching, window minimization) simulate authentic remote evaluation conditions.
-4. **Structured Subject Area Quizzes:** 10 curated technical tracks covering 100 questions across modern frontend, backend, core systems, DevOps, AI, ML, deep learning, data science, cybersecurity, and algorithms.
-5. **Gamification & Learning Streaks:** Daily login rewards, streak milestones, experience points (XP), coin balances, and global competitive leaderboards encourage consistent daily preparation.
+## What It Does
 
----
+MockInterviewHub puts several preparation tools in one place:
 
-## Key Features
-
-### Dynamic AI Mock Interviews
-- **Role and Difficulty Customization:** Select target roles (Frontend, Backend, Full Stack, DevOps, AI) and difficulty levels (Junior, Mid-Level, Senior).
-- **Adaptive Questions:** The AI interviewer evaluates each response in real time and can ask targeted follow-up questions to assess depth of understanding.
-- **Dual Mode Input:** Candidates can speak responses aloud using the browser's native Web Speech Recognition API or type written answers.
-- **Voice Synthesis:** The AI interviewer reads questions aloud using Web Speech Text-to-Speech (TTS) with natural cadence.
-- **Detailed Evaluation:** Each completed session generates scored feedback covering technical depth, communication clarity, confidence, verified strengths, and concrete improvement recommendations.
-
-### Resume ATS Analyzer & Optimizer
-- **Server-Side PDF Stream Parsing:** Automatically extracts contact details, skills, experience, education, projects, and certifications from uploaded PDF files (`pdf-parse`).
-- **Four-Pillar Compatibility Scoring:** Analyzes resumes across Keyword Match, Formatting & Structure, Quantifiable Impact, and Experience Relevance to produce a 0–100% ATS score.
-- **Job Description Matcher:** Paste target job postings to compare keyword overlap, calculate role compatibility, and identify missing industry-standard keywords.
-- **Google XYZ Bullet Optimizer:** Converts passive bullet points into high-impact accomplishment statements following the structure: *"Accomplished [X] as measured by [Y], by doing [Z]"* with 1-click clipboard copy.
-
-### Integrity & Proctoring Checks
-- **Pre-Flight Hardware Check:** Verifies browser camera access, microphone audio streams, and fullscreen permissions before session entry.
-- **Tab & Focus Monitoring:** Tracks tab-switching, window blur, and fullscreen exit events. Automatically alerts the candidate and auto-submits upon reaching the violation limit.
-
-### 10 Curated Technical Quiz Tracks
-The platform includes 10 subject area tracks, each featuring interactive 10-level multiple choice quizzes with hints, timers, and coin rewards:
-- **Frontend Engineering:** HTML5, Modern CSS3, JavaScript (ES6+), and React.js.
-- **Backend Engineering:** Node.js, Express, async I/O, REST design, and microservices.
-- **Core Computer Science:** Operating Systems, Computer Networks, and DBMS.
-- **DevOps & Cloud:** Docker, Kubernetes, CI/CD pipelines, and cloud infrastructure.
-- **Artificial Intelligence:** Search algorithms, heuristic methods, NLP, and knowledge graphs.
-- **Machine Learning:** Supervised and unsupervised algorithms, regression, classification, and metrics.
-- **Deep Learning:** Neural networks, backpropagation, CNNs, RNNs, and Transformers.
-- **Data Science:** Python for data science, Pandas, NumPy, and exploratory data analysis.
-- **Cyber Security:** Web application security, OWASP Top 10, network defense, and cryptography.
-- **Data Structures & Algorithms:** Arrays, linked lists, trees, graphs, sorting, and dynamic programming.
-
-### Candidate Dashboard & Historical Transcripts
-- **Performance Over Time:** Visual SVG charts track score progression across consecutive technical and resume interview sessions.
-- **Attempt History:** Comprehensive session history table with full transcripts, category pills, sub-scores, and AI evaluator feedback.
-- **Personalized Improvement Plan:** Algorithmic recommendations identify weak topic areas from past attempts and provide direct links to targeted practice modules.
-
-### Resilient Dual-Mode Database
-- **Automatic Fallback:** The backend connects to MongoDB Atlas when configured, but automatically falls back to an in-memory/file-based JSON store (`db_fallback.json`) if MongoDB is unreachable, ensuring zero downtime during local development or network outages.
+1. **Resume-based interview.** Questions come from your own resume (skills, projects, experience, education, certifications), with follow-ups based on your answers.
+2. **Technical mock interview.** Pick a topic (React, Node.js, Java, and others), answer by typing or by speaking, and get per-question scoring.
+3. **ATS check.** See keyword matches and gaps against a job description, plus suggested rewrites for weak resume bullets.
+4. **Quizzes.** 36 timed multiple-choice quizzes grouped into 10 tracks.
+5. **Progress.** Coins, daily streaks, a leaderboard, and a history of past interview attempts.
 
 ---
 
+## Features
 
-## System Architecture
+### Resume-based interview (`/resume-interview`)
+- Upload a **PDF or DOCX** resume (up to 10 MB). Files are validated by extension and file signature, parsed on the server, and deleted from disk after processing.
+- Structured data (skills, projects, experience, education, certifications) is extracted by an LLM when an API key is configured. Otherwise a rule-based parser handles it.
+- **Retrieval-augmented question generation:** the resume is split into chunks and the most relevant ones are retrieved for each category you pick (Skills, Experience, Projects, Education, Certifications). Retrieval uses Gemini embeddings with cosine similarity, and falls back to a local BM25-style keyword scorer if embeddings aren't available.
+- Choose difficulty (Easy, Medium, Hard) and questions per category.
+- Each answer is scored out of 10 with feedback. The next follow-up question is generated from your answer.
+- The AI interviewer reads questions aloud using the browser's speech synthesis, and you can answer by voice (speech recognition) or typing.
+- A final report covers technical, communication, and confidence scores, resume match, strengths, weaknesses, and a hiring recommendation. An answer-originality estimate (AI-likelihood) is also produced per answer. Treat it as a rough signal, since it is itself an LLM judgement.
 
-The platform consists of three primary layers:
+### ATS analyzer (shown before the resume interview starts)
+- Scores the resume from 0 to 100 across four areas: keyword match, formatting and structure, quantifiable impact, and experience relevance.
+- Paste a job description to see matched and missing keywords.
+- Suggests rewrites of weak bullet points using the "Accomplished [X] as measured by [Y], by doing [Z]" structure, with one-click copy.
+- The server enforces a 9-second AI timeout and falls back to a deterministic, rule-based analysis. The UI also shows an instant client-side estimate while the scan runs.
 
-### 1. Browser Client (React SPA)
-- Renders the user interface and handles client-side routing.
-- Communicates with the backend through a RESTful JSON API.
-- Uses the Web Speech API for voice interactions.
-- Supports fullscreen and focus controls for proctoring.
+### Technical mock interview (`/interview`)
+- Topics: HTML, CSS, JavaScript, React, Node.js, Express, MongoDB, Java, C++, Python, Full Stack.
+- Written or speaking mode (speech-to-text through the browser's Web Speech API).
+- Each answer is scored from 0 to 10 against an AI-generated ideal answer. The summary screen shows overall, technical, communication, and confidence scores, strengths, and areas to improve. These sub-scores are derived on the client from the overall result, not scored separately by the model.
+- Past sessions are saved and can be reviewed.
 
-### 2. Express.js Backend API
-- Provides authentication, quiz, interview, and resume endpoints.
-- Uses JWT middleware for authentication.
-- Processes resume PDFs and logs proctoring events.
-- Provides health checks and diagnostic endpoints.
+### Quizzes (`/playground/:category`)
+- 36 quizzes in 10 tracks: Frontend, Backend, Core CS, DevOps, AI, Machine Learning, Deep Learning, Data Science, Security, and Programming (DSA, Java, Python, C, C++).
+- 10 levels per quiz, 360 questions in total. Each question has a 20-second timer and an optional hint. Levels unlock in order.
 
-### 3. Persistence and AI Engine
-- **Database:** MongoDB Atlas with Mongoose.
-- **Fallback Storage:** Local JSON store (`db_fallback.json`).
-- **Primary AI Provider:** Google Gemini SDK.
-- **Fallback AI Provider:** Groq Cloud SDK using Llama models.
+### Proctoring
+- A pre-check requires camera, microphone, and fullscreen access plus an acknowledgement of the rules.
+- During a session, tab switches, window blur, and exiting fullscreen count as violations. **3 violations auto-submit the interview.** In the resume interview, violations are also reported to the backend, which logs them to the server console.
+- The camera feed is only shown to the user locally. Nothing is recorded or uploaded, and there is no face detection.
 
-## Architecture Diagram
+### Accounts, progress, and content
+- Sign-up and login with JWT (7-day expiry), profile editing, and a password-change flow.
+- Coins for daily login (5), correct quiz answers (1 each), a 7-day streak bonus (25), and interview scores (1 per 10%).
+- Global quiz leaderboard, plus your interview attempt history.
+- An admin page (`/admin`) for editing quiz categories.
 
+### Works without a database or API keys
+- If MongoDB can't be reached, the backend falls back to a local JSON file (`backend/db_fallback.json`) and keeps working. `/health` reports which mode is active.
+- With no AI keys, interview endpoints return clearly labelled placeholder data (for example, `(Dummy)` questions and a fixed score), so the UI flow can still be tried end to end.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+| :--- | :--- |
+| Frontend | React 18, React Router 6, Axios, React Toastify, React Icons, Tailwind CSS plus custom CSS |
+| Backend | Node.js, Express 4, Mongoose 8, JWT (`jsonwebtoken`), `bcryptjs`, Multer, CORS |
+| Document parsing | `pdf-parse` (PDF), `mammoth` (DOCX) |
+| AI | Google Gemini (`@google/generative-ai`), Groq (`groq-sdk`), optional xAI over HTTP |
+| Retrieval | Gemini `embedding-001` with cosine similarity, plus a local BM25-style fallback |
+| Browser APIs | Web Speech (recognition and synthesis), MediaDevices, Fullscreen, Page Visibility |
+| Data | MongoDB (Atlas or local), or a local JSON file as fallback |
+| Testing | Jest, Supertest, React Testing Library, Pytest |
+| CI/CD | GitHub Actions; Vercel (frontend) and Render (backend) deploy hooks |
+
+---
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph Client["Browser Client"]
-        direction TB
+    subgraph Browser["Browser"]
         UI["React SPA"]
-        Voice["Web Speech API"]
-        Proctor["Proctoring Guard"]
-
-        Voice --> UI
-        Proctor --> UI
+        Media["Camera, Fullscreen, Visibility APIs"]
+        Speech["Web Speech API"]
     end
 
-    subgraph Server["Express.js Backend"]
-        direction TB
-        API["REST API"]
-        Auth["JWT Authentication"]
-        PDF["PDF Resume Engine"]
-        Viol["Proctoring Logger"]
-        Health["Health Probe / Diagnostics"]
-
-        API --> Auth
-        API --> PDF
-        API --> Viol
-        API --> Health
+    subgraph Server["Express API"]
+        Routes["Routes and JWT middleware"]
+        Upload["Multer upload"]
+        Parser["PDF / DOCX parser"]
+        RAG["RAG engine"]
+        AIUtil["AI provider wrapper"]
     end
 
-    subgraph Persistence["Persistence and AI"]
-        direction TB
-        DB["MongoDB Atlas<br/>Mongoose ODM"]
-        JSON["Local JSON Store"]
-        AI["Google Gemini SDK"]
-        Groq["Groq Cloud SDK"]
-
-        DB -.->|Fallback| JSON
-        AI -.->|Fallback| Groq
+    subgraph Data["Persistence"]
+        Mongo[("MongoDB")]
+        JSONDB[("db_fallback.json")]
     end
 
-    UI <-->|REST / JSON| API
-    API --> DB
-    API --> AI
+    subgraph LLM["AI providers"]
+        Gemini["Gemini"]
+        Groq["Groq"]
+        XAI["xAI (optional)"]
+    end
+
+    Media --> UI
+    Speech --> UI
+    UI -->|"REST and JSON"| Routes
+    Routes --> Upload
+    Upload --> Parser
+    Parser --> RAG
+    Routes --> AIUtil
+    RAG --> AIUtil
+    Routes --> Mongo
+    Routes -.->|"if MongoDB is unreachable"| JSONDB
+    AIUtil --> Gemini
+    AIUtil -.->|"fallback"| Groq
+    AIUtil -.->|"optional"| XAI
 ```
 
+How a resume interview flows through the system:
 
-## Data Flow
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as React app
+    participant B as Express API
+    participant R as RAG engine
+    participant L as LLM
 
-1. The React client sends requests to the Express.js backend through the REST API.
-2. The backend validates requests and applies authentication where required.
-3. Application data is stored in MongoDB through Mongoose.
-4. Resume processing and proctoring events are handled by the backend.
-5. Gemini generates or evaluates interview content, with Groq available as a fallback.
-6. The local JSON store provides an alternative persistence mechanism if the primary database is unavailable.
-
-> **Note:** The fallback flows shown above should match the actual implementation. Verify that database fallback and AI-provider failover are implemented before documenting them as automatic mechanisms.
-
+    U->>F: Upload resume (PDF or DOCX)
+    F->>B: POST /api/resume/upload
+    B->>B: Validate, extract text, structure data, save
+    B-->>F: Parsed resume
+    F->>B: POST /api/resume/generate-questions
+    B->>R: Chunk resume and retrieve per category
+    R-->>B: Relevant resume context
+    B->>L: Prompt with retrieved context
+    L-->>B: Questions and ideal answers
+    B-->>F: Questions
+    loop Each question
+        U->>F: Answer (typed or spoken)
+        F->>B: evaluate-answer, detect-ai, follow-up
+        B->>L: Score and generate follow-up
+        B-->>F: Score, feedback, next question
+    end
+    F->>B: POST /api/resume/final-report
+    F->>B: POST /api/resume/save-session
 ```
 
-The diagram illustrates the direction of data flow: the client talks to the Express API, which in turn persists data and invokes the AI engine for interview generation/evaluation.
+**AI provider behavior** (taken from `backend/utils/ai.js` and the controllers):
+
+- **Technical interview:** Gemini first (it tries several model names), then Groq (`llama-3.3-70b-versatile`) if Gemini fails or isn't configured. Setting `AI_PROVIDER=xai` with an xAI key makes xAI the first choice. With no keys at all, placeholder data is returned.
+- **Resume interview and ATS:** use Gemini (or xAI). The ATS endpoint can also use Groq. When no suitable key is available, or an AI call fails, the API returns deterministic fallback output instead of an error.
 
 ---
 
-
----
-
-## Technology Stack
-
-| Domain | Technologies & Libraries |
-| :--- | :--- |
-| **Frontend** | React 18, React Router v6, Axios, React Icons (`react-icons/fi`, `react-icons/fa`), Canvas Confetti, React Toastify |
-| **Styling** | Vanilla CSS3 Design System, Responsive Flexbox & Grid layouts, Custom CSS Tokens |
-| **Backend** | Node.js (v22 LTS), Express.js, JWT (`jsonwebtoken`), bcryptjs, Multer, CORS |
-| **Document Processing** | `pdf-parse` (binary buffer extraction for PDF resumes) |
-| **Persistence** | MongoDB Atlas with Mongoose ODM, with automatic fallback to local JSON database |
-| **AI / LLMs** | Google Gemini Generative AI SDK, Groq SDK (Llama 3 fallback) |
-| **Testing** | Jest, Supertest, React Testing Library, Pytest, Python Requests |
-| **CI / CD** | GitHub Actions (Matrix runners on Ubuntu, caching for npm and pip) |
-| **Deployment Targets** | **Frontend:** Vercel \| **Backend:** Render / Railway \| **DB:** MongoDB Atlas |
-
----
-
-## Repository Structure
+## Project Structure
 
 ```text
 MockInterviewHub/
-|-- .github/
-|   `-- workflows/
-|       |-- ci.yml                   # CI: linting, 105 backend tests, 97 frontend tests, production build
-|       `-- cd.yml                   # CD: deploy hooks, health verification probe, rollback gates
-|-- backend/
-|   |-- config/
-|   |   `-- db.js                    # MongoDB connection manager and index cleanup
-|   |-- controllers/                 # Route controllers (auth, quiz, interview, resume, progress)
-|   |-- data/
-|   |   |-- quizCategoriesData.js    # 10 subject area tracks, 100 questions, structured levels
-|   |   `-- quizzesData.js           # Default legacy quizzes data
-|   |-- middleware/
-|   |   |-- authMiddleware.js        # JWT verification and user authorization
-|   |   `-- uploadMiddleware.js      # Multer memory-storage configuration for PDF uploads
-|   |-- models/                      # Mongoose schemas (User, Score, QuizCategory, ResumeSection, etc.)
-|   |-- routes/                      # Express route endpoints
-|   |-- utils/                       # AI caller (Gemini/Groq), PDF parser, DB seeder, helper utilities
-|   |-- tests/                       # 105 Jest unit, mock, and API route tests
-|   |-- tests_pytest/                # 6 Pytest black-box integration smoke tests
-|   |-- requirements.txt             # Python test dependencies
-|   |-- server.js                    # Express application entry point and /health probe
-|   |-- package.json                 # Backend scripts and dependencies
-|   `-- .env.example                 # Backend environment variable template
-|-- frontend/
-|   |-- public/                      # Static assets, favicon, and index.html
-|   |-- src/
-|   |   |-- __tests__/               # 97 React Testing Library unit tests
-|   |   |-- components/              # UI components (Home, MockInterview, ResumeAI, Dashboard, etc.)
-|   |   |-- context/                 # UserProgressContext (state, auth, coins, streaks, XP)
-|   |   |-- services/                # Axios HTTP client abstractions
-|   |   |-- App.js                   # Application routes and navigation structure
-|   |   `-- index.css                # Custom responsive design system stylesheet
-|   |-- package.json                 # Frontend dependencies and test runners
-|   `-- .env.example                 # Frontend environment variable template
-|-- DEPLOYMENT.md                    # Production deployment and secrets guide
-|-- README.md                        # Primary project documentation
-`-- .gitignore                       # Repository exclusion rules
+├── .github/workflows/
+│   ├── ci.yml                  # Tests and build on push / PR to main
+│   └── cd.yml                  # Deploy hooks and health check after CI passes
+├── backend/
+│   ├── server.js               # App entry point, route mounting, /health
+│   ├── config/
+│   │   ├── db.js               # MongoDB connection and seeding
+│   │   └── multer.js           # Resume upload rules (PDF/DOCX, 10 MB)
+│   ├── controllers/            # auth, user, quiz, progress, leaderboard, interview, resume, admin
+│   ├── middleware/
+│   │   └── authMiddleware.js   # JWT verification
+│   ├── models/                 # Mongoose schemas
+│   ├── routes/                 # Express routers
+│   ├── data/
+│   │   └── quizCategoriesData.js   # 36 quizzes x 10 levels
+│   ├── utils/
+│   │   ├── ai.js               # Gemini / Groq / xAI wrappers, JSON cleanup
+│   │   ├── ragEngine.js        # Chunking, embeddings, keyword fallback
+│   │   ├── resumeParser.js     # Rule-based parser and ATS fallback
+│   │   ├── fileUtils.js        # File validation and text extraction
+│   │   ├── dbFallback.js       # JSON-file persistence
+│   │   ├── seeder.js           # Seeds MongoDB on first connect
+│   │   └── helpers.js
+│   ├── tests/                  # Jest tests (105)
+│   └── tests_pytest/           # Pytest smoke tests against a running server (6)
+├── frontend/
+│   ├── src/
+│   │   ├── components/         # Home, Dashboard, Playground, MockInterview, ResumeAI,
+│   │   │                       # Leaderboard, ProfileSection, AdminPanel, proctoring components, ...
+│   │   ├── context/            # UserProgressContext (auth, coins, streaks, progress)
+│   │   ├── services/api.js     # Axios client and API wrappers
+│   │   ├── __tests__/          # React Testing Library tests (97)
+│   │   └── App.js              # Routes
+│   └── vercel.json             # SPA rewrite for Vercel
+├── DEPLOYMENT.md
+└── LICENSE
 ```
 
 ---
 
-## Prerequisites
+## Getting Started
 
-Before setting up MockInterviewHub locally, ensure you have the following installed:
+### Prerequisites
 
-- **Node.js:** `v20.x` or `v22.x` ([Download Node.js](https://nodejs.org/))
-- **npm:** `v10.x` or higher (bundled with Node.js)
-- **Git:** ([Download Git](https://git-scm.com/))
-- **Python (Optional):** `3.10+` (only needed if running the optional Pytest integration tests)
-- **MongoDB (Optional):** Local daemon or free [MongoDB Atlas](https://www.mongodb.com/atlas) URI *(The app operates in local fallback mode if omitted)*
+- Node.js 20 or newer (CI uses 22) and npm
+- Git
+- Optional: MongoDB (local or [Atlas](https://www.mongodb.com/atlas)). Without it the app uses the local JSON fallback.
+- Optional: a [Gemini](https://aistudio.google.com/) and/or [Groq](https://console.groq.com/) API key for real AI output
+- Optional: Python 3.10+ to run the Pytest smoke tests
 
----
-
-## Installation and Setup
-
-### 1. Clone the Repository
+### 1. Clone
 
 ```bash
 git clone https://github.com/rahulmahasetha/MockInterviewHub.git
 cd MockInterviewHub
 ```
 
-### 2. Configure the Backend
+### 2. Backend
 
-1. Navigate to the `backend` folder:
-   ```bash
-   cd backend
-   ```
-2. Copy the environment template:
-   ```bash
-   cp .env.example .env
-   ```
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
+```bash
+cd backend
+cp .env.example .env
+npm install
+```
 
-### 3. Configure the Frontend
+Open `backend/.env` and set at least `JWT_SECRET`. For a quick local run **without MongoDB**, delete the `MONGODB_URI` line or leave it empty (see [Troubleshooting](#troubleshooting)). Then start the server:
 
-1. In a new terminal window, navigate to the `frontend` folder:
-   ```bash
-   cd frontend
-   ```
-2. Copy the environment template:
-   ```bash
-   cp .env.example .env
-   ```
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
+```bash
+npm run dev      # nodemon, auto-restarts on change
+# or
+npm start
+```
+
+The API runs on `http://localhost:3001`. Check it:
+
+```bash
+curl http://localhost:3001/health
+```
+
+### 3. Frontend
+
+In a second terminal:
+
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm start
+```
+
+The app opens at `http://localhost:3000`.
 
 ---
 
 ## Environment Variables
 
-### Backend Configuration (`backend/.env`)
+### Backend (`backend/.env`)
 
-| Variable | Required | Default / Example | Description |
-| :--- | :--- | :--- | :--- |
-| `PORT` | No | `3001` | Port on which the Express server listens |
-| `NODE_ENV` | No | `development` | Runtime environment (`development`, `production`, `test`) |
-| `MONGODB_URI` | No | `mongodb://127.0.0.1:27017/triviatrek` | MongoDB connection URI. Uses local file store if unreachable |
-| `JWT_SECRET` | Yes | `your_jwt_secret_key_minimum_32_characters` | Secret key used to sign and verify JWT authentication tokens |
-| `GEMINI_API_KEY` | No | *(Empty)* | Google Gemini API key for AI question generation and evaluation |
-| `GROQ_API_KEY` | No | *(Empty)* | Groq API key used as fallback LLM if Gemini is unavailable |
-| `AI_PROVIDER` | No | `gemini` | Primary AI provider (`gemini` or `groq`) |
+| Variable | Required | Description |
+| :--- | :--- | :--- |
+| `PORT` | No | Server port. Default `3001`. |
+| `NODE_ENV` | No | `development`, `production`, or `test`. |
+| `MONGODB_URI` | No | MongoDB connection string. Default `mongodb://127.0.0.1:27017/triviatrek`. If the connection fails after 5 seconds, the app switches to the JSON fallback. |
+| `JWT_SECRET` | **Yes, for any real deployment** | Signing key for tokens. If unset, the code uses a built-in development secret, which is not safe in production. |
+| `GEMINI_API_KEY` | No | Enables Gemini generation and embeddings. |
+| `GROQ_API_KEY` | No | Enables Groq as a fallback provider. |
+| `AI_PROVIDER` | No | Only has an effect when set to `xai` (with `XAI_API_KEY`), which makes xAI the first choice. |
+| `XAI_API_KEY`, `XAI_MODEL`, `XAI_API_URL` | No | Optional xAI settings. Model defaults to `grok-2-latest`. |
 
-### Frontend Configuration (`frontend/.env`)
+### Frontend (`frontend/.env`)
 
-| Variable | Required | Default / Example | Description |
-| :--- | :--- | :--- | :--- |
-| `REACT_APP_API_URL` | Yes | `http://localhost:3001` | Full base URL pointing to the backend API server |
+| Variable | Required | Description |
+| :--- | :--- | :--- |
+| `REACT_APP_API_URL` | No | Backend base URL. Default `http://127.0.0.1:3001`. It is baked into the bundle at build time, so never put secrets in it. |
 
 ---
 
-## Running Locally
+## Usage
 
-### Start Backend Development Server
+1. Open `http://localhost:3000` and sign up. The app needs an account for interviews and progress tracking.
+2. **Resume interview:** go to *Resume AI Interview*, upload a PDF or DOCX, review the ATS results (optionally paste a job description), then choose difficulty and categories and start.
+3. **Technical interview:** go to *Technical Mock Interview*, pick a topic, number of questions, and written or speaking mode.
+4. **Quizzes:** open a track from *Courses* or the Subject Areas list and work through the levels.
+5. Check your standing and past attempts on the **Leaderboard** page.
+
+Both interview types and the quizzes ask for camera, microphone, and fullscreen access first. Use a Chromium-based browser for speech features, since support for the Web Speech API varies.
+
+### API example
+
+Using the backend directly (the same flow the frontend uses):
 
 ```bash
-cd backend
-npm run dev
-```
-*The server will start at `http://localhost:3001` and verify the database status.*
+# 1. Create an account and keep the token
+TOKEN=$(curl -s -X POST http://localhost:3001/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"username":"demo_user","email":"demo@example.com","password":"secret12"}' \
+  | node -pe 'JSON.parse(require("fs").readFileSync(0)).token')
 
-### Start Frontend Application
+# 2. Generate interview questions
+curl -s -X POST http://localhost:3001/api/interview/generate \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"topic":"React","numQuestions":2}'
 
-```bash
-cd frontend
-npm start
+# 3. Upload a resume and run an ATS analysis against a job description
+curl -s -X POST http://localhost:3001/api/resume/upload \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "resume=@/path/to/resume.pdf"
+
+curl -s -X POST http://localhost:3001/api/resume/analyze \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jobDescription":"React and Node.js developer with Docker and AWS experience"}'
 ```
-*The React app will launch automatically in your default browser at `http://localhost:3000`.*
+
+With no AI keys configured, step 2 returns placeholder questions:
+
+```json
+{
+  "success": true,
+  "questions": [
+    {
+      "question": "(Dummy) Can you explain a core concept in React? (Question 1)",
+      "idealAnswer": "(Dummy) The ideal answer would explain the core concept in detail."
+    }
+  ]
+}
+```
 
 ---
 
 ## API Reference
 
-All requests and responses use standard JSON payloads.
+The frontend calls the `/api/...` form of the interview, resume, and admin routes. The same routers are also mounted without the `/api` prefix. "JWT" means an `Authorization: Bearer <token>` header is required.
 
-| Method | Endpoint | Access | Description |
+| Method | Endpoint | Auth | Purpose |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Public | System uptime, timestamp, and database connectivity probe |
-| `POST` | `/auth/signup` | Public | Register a new candidate account with hashed password |
-| `POST` | `/auth/login` | Public | Authenticate user credentials and return a signed JWT token |
-| `GET` | `/auth/me` | Protected | Fetch profile details of the currently authenticated user |
-| `PUT` | `/auth/update-profile`| Protected | Update candidate display name, college, branch, or year |
-| `GET` | `/quiz-categories` | Public | Retrieve all 10 subject area tracks and difficulty levels |
-| `GET` | `/leaderboard` | Public | Fetch global top scores and user rankings |
-| `POST` | `/progress/score` | Protected | Submit completed quiz score and update candidate coins / XP |
-| `POST` | `/api/interview/generate-questions` | Public | Generate dynamic interview questions for role and level |
-| `POST` | `/api/interview/evaluate-answer` | Public | Evaluate candidate answer transcript and return feedback |
-| `POST` | `/api/interview/save` | Protected | Save completed interview session transcript to history |
-| `GET` | `/api/interview/history` | Protected | Retrieve all past mock interviews completed by the user |
-| `POST` | `/api/resume/upload` | Public | Upload resume (PDF) and receive structured parsed data |
-| `POST` | `/api/resume/analyze` | Public | Generate ATS rating, skill gaps, and keyword recommendations |
-| `POST` | `/api/resume/log-violation` | Public | Log proctoring warning event (tab switch, window blur) |
+| `GET` | `/health` | None | Uptime and database mode (`connected` or `fallback_mode`) |
+| `POST` | `/auth/signup`, `/auth/login`, `/auth/forgot-password` | None | Account creation, login, password reset |
+| `PUT` | `/auth/update-profile` | JWT | Update profile or password |
+| `GET` | `/auth/profile/:userId` | JWT | Current user's profile |
+| `GET` | `/quiz-categories`, `/quiz-categories/:slug` | None | List or fetch quizzes |
+| `POST` `PUT` `DELETE` | `/quiz-categories[/:slug]` | None | Manage quizzes (used by the admin page) |
+| `GET` `POST` `PUT` `DELETE` | `/progress[/:id]` | JWT | Quiz progress, coins, streaks |
+| `GET` `POST` `PUT` | `/leaderboard[/:id]` | None | Leaderboard entries |
+| `POST` | `/api/interview/generate` | JWT | Generate technical questions for a topic |
+| `POST` | `/api/interview/evaluate` | JWT | Score answers |
+| `POST` | `/api/interview/save` | JWT | Save a finished session |
+| `GET` | `/api/interview/history/:userId` | JWT | Past technical sessions |
+| `POST` | `/api/resume/upload` | JWT | Upload and parse a resume (multipart field `resume`) |
+| `POST` | `/api/resume/analyze` | JWT | ATS analysis |
+| `GET` | `/api/resume/:userId` | JWT | Stored parsed resume |
+| `POST` | `/api/resume/generate-questions` | JWT | Resume-grounded questions |
+| `POST` | `/api/resume/follow-up` | JWT | Follow-up question |
+| `POST` | `/api/resume/evaluate-answer` | JWT | Score one answer |
+| `POST` | `/api/resume/detect-ai` | JWT | Answer originality estimate |
+| `POST` | `/api/resume/final-report` | JWT | Final interview report |
+| `POST` | `/api/resume/save-session` | JWT | Save a finished resume interview |
+| `GET` | `/api/resume/history/:userId` | JWT | Past resume interviews |
+| `POST` | `/api/resume/proctor-violation` | JWT | Report a proctoring violation |
+| `GET` `POST` `PUT` `DELETE` | `/api/admin/sections[/:id]` | JWT | Resume section definitions |
+| `GET` `POST` `PUT` `DELETE` | `/users[/:id]` | JWT | User management |
 
 ---
 
-## Automated Testing & CI/CD
+## Testing and CI/CD
 
-MockInterviewHub features a complete automated test suite across backend and frontend layers with zero reliance on paid external APIs during testing.
+| Suite | Count | Command |
+| :--- | :--- | :--- |
+| Backend (Jest and Supertest) | 105 | `cd backend && npm test` |
+| Frontend (React Testing Library) | 97 | `cd frontend && npm run test:ci` |
+| API smoke tests (Pytest) | 6 | see below |
 
-### Backend Tests (Jest)
-Runs 105 tests covering controllers, auth middleware, health probes, database seeder, and AI fallback logic:
+Tests don't call paid AI APIs. The backend suite runs with empty AI keys.
+
+Coverage reports:
+
 ```bash
-cd backend
-npm test
-```
-To run tests with coverage reporting:
-```bash
-npm run test:coverage
+cd backend && npm run test:coverage
+cd frontend && npm run test:coverage
 ```
 
-### Pytest Integration Smoke Tests
-Runs 6 end-to-end black-box integration tests verifying live endpoints:
+The Pytest suite needs a running server:
+
 ```bash
 cd backend
 pip install -r requirements.txt
-pytest tests_pytest -v
+node server.js &                      # in one terminal, or run in the background
+API_BASE_URL=http://127.0.0.1:3001 pytest tests_pytest -v
 ```
 
-### Frontend Tests (React Testing Library)
-Runs 97 component tests covering MCQ cards, quiz flows, score summaries, and progress contexts:
-```bash
-cd frontend
-npm test -- --watchAll=false
-```
-To run tests with coverage reporting:
-```bash
-npm run test:coverage
-```
+**CI** (`ci.yml`) runs on pushes and pull requests to `main`, on Node 22:
+- Backend: clean install, `node --check` syntax validation, Jest with coverage, then the Pytest suite against a live server.
+- Frontend: clean install, tests with coverage, production build, and a check that `build/index.html` exists.
 
-### Continuous Integration Pipeline
-GitHub Actions automatically executes on every push and pull request to the `main` branch:
-1. **Backend Job:** Node.js 20 & 22 environment matrix, syntax linting, 105 Jest tests, and Pytest smoke tests.
-2. **Frontend Job:** Node.js 20 & 22 environment matrix, 97 component tests, and optimized production build (`npm run build`).
+**CD** (`cd.yml`) runs after CI succeeds on `main`, or manually. It triggers a Render deploy hook for the backend and deploys the frontend to Vercel, then polls `/health` (up to 15 times, 10 seconds apart) and checks the frontend URL. The steps are skipped with a notice when the matching secrets aren't set. Rollbacks are manual. See [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ---
 
-## Production Deployment
+## Challenges and Design Decisions
 
-MockInterviewHub is architected for zero-downtime deployment:
-- **Frontend:** Hosted on **Vercel** with automatic edge CDN caching.
-- **Backend:** Hosted on **Render** or **Railway** as a managed web service with container auto-scaling.
-- **Database:** Hosted on **MongoDB Atlas** with automated connection pooling and schema indexing.
+- **Grounding questions in the resume.** Sending a whole resume to an LLM tends to produce generic questions. Chunking the resume by section and retrieving the most relevant chunks per category keeps questions specific to the candidate's own projects. Embeddings are used when a Gemini key exists, with a local keyword scorer as a no-cost fallback.
+- **Keeping the app usable when services fail.** Every AI-backed endpoint has a defined fallback path (another provider, a rule-based parser, or labelled placeholder data), and the backend keeps running on a JSON file if MongoDB is down. That makes the project easy to run and demo, and the tests don't depend on external services.
+- **Unreliable LLM output.** Model responses often arrive wrapped in markdown fences or with extra text. `utils/ai.js` strips these and extracts the JSON, and falls back to a default value when parsing still fails, so one bad response doesn't crash a session.
+- **Hanging requests.** The ATS endpoint races the AI call against a 9-second timeout, and the UI shows an instant client-side estimate while waiting.
+- **Safer uploads.** Resume uploads are restricted by extension and size, checked against the file's actual signature (`%PDF` or the ZIP header for DOCX), mapped to clear error messages for corrupted or encrypted files, and deleted after parsing.
+- **Proctoring without a heavy stack.** Pre-checks and violation tracking use only standard browser APIs (MediaDevices, Fullscreen, Page Visibility, window blur), which keeps the feature dependency-free and avoids uploading any video.
 
-For complete, step-by-step instructions on deployment configuration, environment secrets, and rollback playbooks, consult:
+---
 
-[Production CI/CD & Deployment Guide (DEPLOYMENT.md)](DEPLOYMENT.md)
+## Known Limitations
+
+This is a learning and portfolio project, and a few things are worth knowing before treating it as production software:
+
+- **JSON fallback mode is for local development only.** In that mode passwords are stored as plain text. With MongoDB connected, passwords are hashed with bcrypt.
+- Quiz write routes (`POST/PUT/DELETE /quiz-categories`) and the leaderboard write routes have no authentication, and there is no admin role check on `/admin`. CORS is open to all origins.
+- Password reset checks only the username and email; there is no email verification.
+- Proctoring is client-side and can be bypassed by a determined user. It is a practice aid, not an exam-integrity system.
+- The Dashboard page includes some placeholder values (for example, the performance chart and some stat cards). Real history is on the Leaderboard and interview pages.
+- `/resume-builder` is an unfinished form: it has no save or export, and it loads its sections from a protected endpoint without sending a token.
+- The `PreInterviewCheck` rules text says 10 warnings end a session, but the interviews enforce 3.
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+| :--- | :--- |
+| Backend logs "Could not connect to database" and says it is in resilient mode | Expected without MongoDB. The `.env.example` value for `MONGODB_URI` is a placeholder Atlas string. Put in a real URI, point it at a local MongoDB, or remove the line to use the fallback. |
+| Frontend loads but requests fail or show network errors | Make sure the backend is running and `REACT_APP_API_URL` matches its address. Restart `npm start` after editing `.env`. |
+| `401 Access denied` or "Invalid or expired token" | Log in again. Tokens last 7 days, and changing `JWT_SECRET` invalidates existing tokens. |
+| Interview questions start with "(Dummy)" | No AI key is configured. Set `GEMINI_API_KEY` or `GROQ_API_KEY` in `backend/.env` and restart the backend. |
+| "Could not extract readable text from this resume" | The PDF is probably scanned or image-only. Use a text-based PDF or a DOCX. |
+| Camera or microphone check never passes | Allow permissions in the browser. Camera access needs `localhost` or HTTPS. |
+| Voice input or read-aloud doesn't work | Use a Chromium-based browser. Web Speech API support varies. |
+| Port 3001 or 3000 already in use | Change `PORT` in `backend/.env` and update `REACT_APP_API_URL` to match. |
+| Pytest can't connect | Start the backend first and set `API_BASE_URL` to its address. |
+
+---
+
+## Deployment
+
+The intended setup is the frontend on Vercel, the backend on Render (or similar), and MongoDB on Atlas. Required secrets, health checks, and rollback steps are in [DEPLOYMENT.md](DEPLOYMENT.md).
+
+When deploying, set `JWT_SECRET`, `MONGODB_URI`, and your AI keys on the backend host, and set `REACT_APP_API_URL` on the frontend host.
 
 ---
 
 ## Contributing
 
-Contributions are welcome and appreciated. To contribute:
-
-1. Fork the repository.
-2. Create a descriptive feature branch:
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-3. Commit your changes:
-   ```bash
-   git commit -m "feat: add your feature description"
-   ```
-4. Verify that all automated tests pass:
-   ```bash
-   cd backend && npm test
-   cd ../frontend && npm test -- --watchAll=false
-   ```
-5. Push to your branch and open a Pull Request against `main`.
+1. Fork the repository and create a branch: `git checkout -b feature/your-feature`
+2. Make your change and run the tests (`cd backend && npm test`, `cd frontend && npm run test:ci`)
+3. Commit with a clear message and open a pull request against `main`
 
 ---
 
 ## License
 
-This project is open-source and licensed under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE).
+
