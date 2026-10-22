@@ -86,30 +86,54 @@ The platform includes 10 subject area tracks, each featuring interactive 10-leve
 
 ## System Architecture
 
-```text
-+-------------------------------------------------------------------------------+
-|                               Browser Client                                  |
-|  - React 18 Single Page Application                                           |
-|  - Web Speech API (SpeechRecognition + SpeechSynthesis)                       |
-|  - Fullscreen & Focus Proctoring Guard                                        |
-+---------------------------------------+---------------------------------------+
-                                        | HTTP REST / JSON
-                                        v
-+-------------------------------------------------------------------------------+
-|                            Express.js Backend API                             |
-|  - JWT Authentication Middleware                                              |
-|  - PDF Resume Stream Extraction Engine (pdf-parse)                            |
-|  - Proctoring Violation Event Logger                                          |
-|  - Health & Diagnostics Probe (/health)                                       |
-+-------------------+-----------------------------------+-----------------------+
-                    |                                   |
-                    v                                   v
-+-----------------------------------+   +---------------------------------------+
-|          Persistence              |   |               AI Engine               |
-|  - MongoDB Atlas (Mongoose ODM)   |   |  - Primary: Google Gemini SDK         |
-|  - Auto-Fallback: Local JSON Store|   |  - Secondary: Groq Cloud SDK          |
-+-----------------------------------+   +---------------------------------------+
+## System Architecture
+
+The platform consists of three primary layers:
+
+1. **Browser Client (React SPA)**
+   - Renders UI, handles routing, and interacts with the backend via a RESTful JSON API.
+   - Utilizes Web Speech API for voice interaction and enforces fullscreen/focus for proctoring.
+
+2. **Express.js Backend API**
+   - Exposes authentication, quiz, interview, and resume endpoints.
+   - Includes JWT middleware, PDF parsing, proctoring event logging, and health probe.
+
+3. **Persistence & AI Engine**
+   - **Persistence:** MongoDB Atlas accessed through Mongoose; a local JSON store (`db_fallback.json`) provides automatic fallback.
+   - **AI Engine:** Primary Google Gemini SDK with Groq (Llama 3) as a secondary fallback.
+
+```mermaid
+flowchart LR
+    subgraph Client[Browser Client]
+        direction TB
+        UI[React SPA] -->|REST/JSON| API
+        Voice[Web Speech API] --> UI
+        Proctor[Proctoring Guard] --> UI
+    end
+
+    subgraph Server[Express.js Backend]
+        direction TB
+        API[REST API] --> Auth[JWT Auth]
+        API --> PDF[PDF Resume Engine]
+        API --> Viol[Proctoring Logger]
+        API --> Health[/Health Probe/Diagnostics/]
+    end
+
+    subgraph Persistence[Persistence & AI]
+        direction TB
+        DB[MongoDB Atlas\n(Mongoose ODM)] -->|fallback| JSON[Local JSON Store]
+        AI[Google Gemini SDK] -->|fallback| Groq[Groq Cloud SDK]
+    end
+
+    UI --> API
+    API --> DB
+    API --> AI
 ```
+
+The diagram illustrates the direction of data flow: the client talks to the Express API, which in turn persists data and invokes the AI engine for interview generation/evaluation.
+
+---
+
 
 ---
 
